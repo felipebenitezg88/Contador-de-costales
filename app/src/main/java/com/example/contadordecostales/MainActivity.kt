@@ -210,15 +210,16 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        val pauseButton = makeButton(
-            "PAUSAR", Color.rgb(37, 99, 235)
-        ) {
-            isCounting = !isCounting
-            (it as? Button)?.text =
-                if (isCounting) "PAUSAR" else "REANUDAR"
-            statusText.text =
-                if (isCounting) "Conteo activo" else "Conteo pausado"
-        }
+        lateinit var pauseButton: Button
+pauseButton = makeButton(
+    "PAUSAR", Color.rgb(37, 99, 235)
+) {
+    isCounting = !isCounting
+    pauseButton.text =
+        if (isCounting) "PAUSAR" else "REANUDAR"
+    statusText.text =
+        if (isCounting) "Conteo activo" else "Conteo pausado"
+}
 
         val resetButton = makeButton(
             "REINICIAR", Color.rgb(71, 85, 105)
