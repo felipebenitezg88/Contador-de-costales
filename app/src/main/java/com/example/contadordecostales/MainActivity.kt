@@ -48,8 +48,10 @@ class MainActivity : AppCompatActivity() {
 
     private var totalCount = 0
 
-    @Volatile
-    private var isCounting = true
+@Volatile
+private var isCounting = true
+
+private val savedCounts = mutableListOf<String>()
 
     private val stateLock = Any()
     private val previousSides = mutableMapOf<Int, Boolean>()
