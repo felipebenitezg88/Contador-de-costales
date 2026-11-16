@@ -77,10 +77,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Mantener visibles las barras del teléfono.
-        window.statusBarColor = Color.rgb(20, 29, 39)
-        window.navigationBarColor = Color.rgb(20, 29, 39)
-        window.decorView.systemUiVisibility = 0
+        // Respetar las barras del teléfono.
+window.statusBarColor = Color.rgb(20, 29, 39)
+window.navigationBarColor = Color.rgb(20, 29, 39)
+window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+
+if (android.os.Build.VERSION.SDK_INT >= 29) {
+    window.isNavigationBarContrastEnforced = false
+    window.isStatusBarContrastEnforced = false
+}
 
         linePosition = preferences.getInt("line_position", 50)
         sensitivity = preferences.getInt("sensitivity", 2)
@@ -292,6 +297,22 @@ pauseButton = makeButton(
         root.addView(rowTwo)
 
         setContentView(root)
+
+androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+    val bars = insets.getInsets(
+        androidx.core.view.WindowInsetsCompat.Type.systemBars()
+    )
+
+    view.setPadding(
+        dp(12) + bars.left,
+        dp(10) + bars.top,
+        dp(12) + bars.right,
+        dp(8) + bars.bottom
+    )
+    insets
+}
+
+androidx.core.view.ViewCompat.requestApplyInsets(root)
     }
 
     private fun showSettings() {
