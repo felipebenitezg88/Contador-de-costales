@@ -57,6 +57,9 @@ class MainActivity : AppCompatActivity() {
 private var isCounting = true
 
 private val savedCounts = mutableListOf<String>()
+private val historyPreferences by lazy {
+    getSharedPreferences("historial_conteos", MODE_PRIVATE)
+}
 
     private val stateLock = Any()
     private val previousSides = mutableMapOf<Int, Boolean>()
