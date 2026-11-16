@@ -9,8 +9,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/logo"
-        android:roundIcon="@drawable/logo"
+        android:icon="@drawable/contador_concede_icono_512"
+android:roundIcon="@drawable/contador_concede_icono_512"
         android:label="CONTADOR CONSEDE"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:usesCleartextTraffic="false">
