@@ -4,10 +4,12 @@ package com.example.contadordecostales
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -44,12 +46,12 @@ class MainActivity : AppCompatActivity() {
     private var sensitivity = 2
     private var soundEnabled = true
 
-    private val stateLock = Any()
     private var totalCount = 0
 
     @Volatile
     private var isCounting = true
 
+    private val stateLock = Any()
     private val previousSides = mutableMapOf<Int, Boolean>()
     private val countedIds = mutableSetOf<Int>()
 
@@ -58,38 +60,41 @@ class MainActivity : AppCompatActivity() {
             .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
             .enableMultipleObjects()
             .build()
-
         ObjectDetection.getClient(options)
     }
 
     private val detector by detectorLazy
-
     private var toneGenerator: ToneGenerator? = null
 
     private val cameraPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                startCamera()
-            } else {
-                statusText.text = "Permiso de cámara denegado"
-            }
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) startCamera()
+            else statusText.text = "Permiso de cámara denegado"
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Mantener visibles las barras del teléfono.
+        window.statusBarColor = Color.rgb(20, 29, 39)
+        window.navigationBarColor = Color.rgb(20, 29, 39)
+        window.decorView.systemUiVisibility = 0
 
         linePosition = preferences.getInt("line_position", 50)
         sensitivity = preferences.getInt("sensitivity", 2)
         soundEnabled = preferences.getBoolean("sound_enabled", true)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-        toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+        toneGenerator = ToneGenerator(
+            AudioManager.STREAM_NOTIFICATION, 80
+        )
 
         createInterface()
 
         if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
+                this, Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             startCamera()
@@ -98,88 +103,192 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun roundedBackground(color: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(14).toFloat()
+        }
+    }
+
+    private fun makeButton(
+        label: String,
+        color: Int,
+        action: () -> Unit
+    ): Button {
+        return Button(this).apply {
+            text = label
+            textSize = 13f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = roundedBackground(color)
+            setOnClickListener { action() }
+            layoutParams = LinearLayout.LayoutParams(
+                0, dp(52), 1f
+            ).apply {
+                setMargins(dp(4), dp(3), dp(4), dp(3))
+            }
+        }
+    }
+
     private fun createInterface() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 20, 16, 12)
-            setBackgroundColor(Color.rgb(20, 25, 32))
+            setPadding(dp(12), dp(10), dp(12), dp(8))
+            setBackgroundColor(Color.rgb(20, 29, 39))
         }
 
         val title = TextView(this).apply {
             text = "CONTADOR DE COSTALES"
-            textSize = 22f
+            textSize = 20f
             setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(5), 0, dp(10))
+        }
+
+        val counterCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = roundedBackground(Color.rgb(38, 55, 70))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+
+        val counterLabel = TextView(this).apply {
+            text = "TOTAL DE COSTALES"
+            textSize = 13f
+            setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
         }
 
         countText = TextView(this).apply {
-            text = "Costales: 0"
-            textSize = 34f
-            setTextColor(Color.rgb(70, 220, 130))
+            text = "0"
+            textSize = 42f
+            setTextColor(Color.rgb(75, 230, 150))
             gravity = Gravity.CENTER
-            setPadding(0, 16, 0, 8)
         }
 
         statusText = TextView(this).apply {
             text = "Preparando cámara..."
-            textSize = 16f
-            setTextColor(Color.WHITE)
+            textSize = 13f
+            setTextColor(Color.rgb(75, 230, 150))
             gravity = Gravity.CENTER
-            setPadding(0, 8, 0, 12)
+            setPadding(0, dp(3), 0, dp(3))
+        }
+
+        counterCard.addView(counterLabel)
+        counterCard.addView(countText)
+        counterCard.addView(statusText)
+
+        val cameraLabel = TextView(this).apply {
+            text = "CÁMARA EN VIVO"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setPadding(dp(4), dp(9), dp(4), dp(5))
+        }
+
+        val cameraContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedBackground(Color.rgb(12, 19, 27))
+            setPadding(dp(5), dp(5), dp(5), dp(5))
         }
 
         previewView = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
 
-        val previewParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        cameraContainer.addView(
+            previewView,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0, 1f
+            )
         )
 
-        val buttons = LinearLayout(this).apply {
+        val rowOne = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
         }
 
-        val pauseButton = Button(this).apply {
-            text = "Pausar"
-            setOnClickListener {
-                isCounting = !isCounting
-                text = if (isCounting) "Pausar" else "Reanudar"
-                statusText.text =
-                    if (isCounting) "Conteo activo" else "Conteo pausado"
+        val pauseButton = makeButton(
+            "PAUSAR", Color.rgb(37, 99, 235)
+        ) {
+            isCounting = !isCounting
+            (it as? Button)?.text =
+                if (isCounting) "PAUSAR" else "REANUDAR"
+            statusText.text =
+                if (isCounting) "Conteo activo" else "Conteo pausado"
+        }
+
+        val resetButton = makeButton(
+            "REINICIAR", Color.rgb(71, 85, 105)
+        ) {
+            synchronized(stateLock) {
+                totalCount = 0
+                previousSides.clear()
+                countedIds.clear()
             }
+            countText.text = "0"
+            statusText.text = "Contador reiniciado"
         }
 
-        val resetButton = Button(this).apply {
-            text = "Reiniciar"
-            setOnClickListener {
-                synchronized(stateLock) {
-                    totalCount = 0
-                    previousSides.clear()
-                    countedIds.clear()
-                }
-                countText.text = "Costales: 0"
-                statusText.text = "Contador reiniciado"
-            }
+        rowOne.addView(pauseButton)
+        rowOne.addView(resetButton)
+
+        val rowTwo = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
         }
 
-        val settingsButton = Button(this).apply {
-            text = "Ajustes"
-            setOnClickListener {
-                showSettings()
-            }
+        val settingsButton = makeButton(
+            "AJUSTES", Color.rgb(37, 99, 235)
+        ) {
+            showSettings()
         }
 
-        buttons.addView(pauseButton)
-        buttons.addView(resetButton)
-        buttons.addView(settingsButton)
+        val historyButton = makeButton(
+            "HISTORIAL", Color.rgb(38, 55, 70)
+        ) {
+            AlertDialog.Builder(this)
+                .setTitle("Historial")
+                .setMessage("El historial de producción se agregará en la siguiente actualización.")
+                .setPositiveButton("Aceptar", null)
+                .show()
+        }
+
+        val reportsButton = makeButton(
+            "REPORTES", Color.rgb(38, 55, 70)
+        ) {
+            AlertDialog.Builder(this)
+                .setTitle("Reportes")
+                .setMessage("Los reportes de producción se agregarán en la siguiente actualización.")
+                .setPositiveButton("Aceptar", null)
+                .show()
+        }
+
+        rowTwo.addView(settingsButton)
+        rowTwo.addView(historyButton)
+        rowTwo.addView(reportsButton)
 
         root.addView(title)
-        root.addView(countText)
-        root.addView(statusText)
-        root.addView(previewView, previewParams)
-        root.addView(buttons)
+        root.addView(
+            counterCard,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        root.addView(cameraLabel)
+        root.addView(
+            cameraContainer,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0, 1f
+            ).apply {
+                bottomMargin = dp(7)
+            }
+        )
+        root.addView(rowOne)
+        root.addView(rowTwo)
 
         setContentView(root)
     }
@@ -187,11 +296,12 @@ class MainActivity : AppCompatActivity() {
     private fun showSettings() {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 12, 28, 8)
+            setPadding(dp(24), dp(10), dp(24), dp(8))
         }
 
-        val lineLabel = TextView(this)
-        lineLabel.text = "Posición de línea: $linePosition%"
+        val lineLabel = TextView(this).apply {
+            text = "Posición de línea: $linePosition%"
+        }
         content.addView(lineLabel)
 
         val lineBar = SeekBar(this).apply {
@@ -200,9 +310,9 @@ class MainActivity : AppCompatActivity() {
         }
         content.addView(lineBar)
 
-        val sensitivityLabel = TextView(this)
-        sensitivityLabel.text =
-            "Sensibilidad: ${sensitivity / 10f}% del área"
+        val sensitivityLabel = TextView(this).apply {
+            text = "Sensibilidad: ${sensitivity / 10f}% del área"
+        }
         content.addView(sensitivityLabel)
 
         val sensitivityBar = SeekBar(this).apply {
@@ -214,14 +324,11 @@ class MainActivity : AppCompatActivity() {
         lineBar.setOnSeekBarChangeListener(
             object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(
-                    seekBar: SeekBar?,
-                    progress: Int,
-                    fromUser: Boolean
+                    seekBar: SeekBar?, progress: Int, fromUser: Boolean
                 ) {
                     lineLabel.text =
                         "Posición de línea: ${progress + 20}%"
                 }
-
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             }
@@ -230,14 +337,11 @@ class MainActivity : AppCompatActivity() {
         sensitivityBar.setOnSeekBarChangeListener(
             object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(
-                    seekBar: SeekBar?,
-                    progress: Int,
-                    fromUser: Boolean
+                    seekBar: SeekBar?, progress: Int, fromUser: Boolean
                 ) {
                     sensitivityLabel.text =
                         "Sensibilidad: ${(progress + 1) / 10f}% del área"
                 }
-
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             }
@@ -307,16 +411,13 @@ class MainActivity : AppCompatActivity() {
                             imageProxy.imageInfo.rotationDegrees
 
                         val inputImage = InputImage.fromMediaImage(
-                            mediaImage,
-                            rotation
+                            mediaImage, rotation
                         )
 
                         val rotated = rotation == 90 || rotation == 270
-
                         val imageWidth =
                             if (rotated) imageProxy.height
                             else imageProxy.width
-
                         val imageHeight =
                             if (rotated) imageProxy.width
                             else imageProxy.height
@@ -330,26 +431,23 @@ class MainActivity : AppCompatActivity() {
                                 synchronized(stateLock) {
                                     for (obj in objects) {
                                         val id = obj.trackingId ?: continue
-
                                         val box = obj.boundingBox
+
                                         val areaRatio =
                                             (box.width().toFloat() *
                                              box.height().toFloat()) /
                                             (imageWidth.toFloat() *
                                              imageHeight.toFloat())
 
-                                        val minimumArea =
-                                            sensitivity / 1000f
-
-                                        if (areaRatio < minimumArea) {
+                                        if (areaRatio < sensitivity / 1000f) {
                                             continue
                                         }
 
-                                        val centerX = box.centerX()
                                         val lineX =
                                             imageWidth * linePosition / 100f
+                                        val isRightSide =
+                                            box.centerX() >= lineX
 
-                                        val isRightSide = centerX >= lineX
                                         val previous = previousSides[id]
 
                                         if (previous != null &&
@@ -367,9 +465,7 @@ class MainActivity : AppCompatActivity() {
 
                                 if (newCount >= 0) {
                                     runOnUiThread {
-                                        countText.text =
-                                            "Costales: $newCount"
-
+                                        countText.text = newCount.toString()
                                         if (soundEnabled) {
                                             toneGenerator?.startTone(
                                                 ToneGenerator.TONE_PROP_BEEP,
@@ -395,7 +491,6 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 cameraProvider.unbindAll()
-
                 cameraProvider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
@@ -408,7 +503,6 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 statusText.text = "No se pudo iniciar la cámara"
             }
-
         }, ContextCompat.getMainExecutor(this))
     }
 
