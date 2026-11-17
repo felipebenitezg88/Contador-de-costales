@@ -345,6 +345,122 @@ androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, inset
 
 androidx.core.view.ViewCompat.requestApplyInsets(root)
     }
+    
+private fun showSaveCountDialog() {
+    val originalCount = synchronized(stateLock) {
+        totalCount
+    }
+
+    val content = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(20), dp(10), dp(20), dp(10))
+    }
+
+    fun addField(
+        label: String,
+        numeric: Boolean = false
+    ): android.widget.EditText {
+        val title = TextView(this).apply {
+            text = label
+            textSize = 14f
+            setTextColor(Color.BLACK)
+        }
+        content.addView(title)
+
+        val field = android.widget.EditText(this).apply {
+            hint = "Escribe aquí"
+            textSize = 16f
+            if (numeric) {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+        }
+        content.addView(field)
+        return field
+    }
+
+    val countLabel = TextView(this).apply {
+        text = "Conteo original: $originalCount"
+        textSize = 18f
+        setTextColor(Color.rgb(22, 163, 74))
+    }
+    content.addView(countLabel)
+
+    val cuadrilla = addField("Cuadrilla")
+    val estiba = addField("Estiba")
+    val rotosOrigen = addField("Sacos rotos de origen", true)
+    val rotosManiobra = addField("Sacos rotos por maniobra", true)
+    val comentarios = addField("Comentarios")
+    val supervisor = addField("Supervisor")
+
+    val scroll = android.widget.ScrollView(this).apply {
+        addView(content)
+    }
+
+    val dialog = AlertDialog.Builder(this)
+        .setTitle("Guardar conteo")
+        .setView(scroll)
+        .setNegativeButton("Cancelar", null)
+        .setPositiveButton("Confirmar y guardar", null)
+        .create()
+
+    dialog.setOnShowListener {
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            .setOnClickListener {
+                val origen = rotosOrigen.text.toString()
+                    .toIntOrNull() ?: 0
+                val maniobra = rotosManiobra.text.toString()
+                    .toIntOrNull() ?: 0
+
+                if (origen + maniobra > originalCount) {
+                    android.widget.Toast.makeText(
+                        this,
+                        "Los sacos rotos no pueden superar el conteo",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@setOnClickListener
+                }
+
+                val totalNeto = originalCount - origen - maniobra
+                val fecha = SimpleDateFormat(
+                    "dd/MM/yyyy HH:mm:ss",
+                    Locale.getDefault()
+                ).format(Date())
+
+                val registro = JSONObject().apply {
+                    put("fecha", fecha)
+                    put("conteoOriginal", originalCount)
+                    put("cuadrilla", cuadrilla.text.toString())
+                    put("estiba", estiba.text.toString())
+                    put("rotosOrigen", origen)
+                    put("rotosManiobra", maniobra)
+                    put("totalNeto", totalNeto)
+                    put("comentarios", comentarios.text.toString())
+                    put("supervisor", supervisor.text.toString())
+                }
+
+                savedCounts.add(registro.toString())
+
+                val historyArray = JSONArray()
+                savedCounts.forEach {
+                    historyArray.put(it)
+                }
+
+                historyPreferences.edit()
+                    .putString("registros", historyArray.toString())
+                    .apply()
+
+                android.widget.Toast.makeText(
+                    this,
+                    "Conteo guardado. Total neto: $totalNeto",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+
+                dialog.dismiss()
+            }
+    }
+
+    dialog.show()
+}
 
     private fun showSettings() {
         val content = LinearLayout(this).apply {
