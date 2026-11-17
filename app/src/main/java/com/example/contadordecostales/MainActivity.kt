@@ -105,6 +105,15 @@ if (android.os.Build.VERSION.SDK_INT >= 29) {
         toneGenerator = ToneGenerator(
             AudioManager.STREAM_NOTIFICATION, 80
         )
+        
+// Cargar historial guardado
+savedCounts.clear()
+val historyJson = historyPreferences.getString("registros", "[]")
+val historyArray = JSONArray(historyJson)
+
+for (i in 0 until historyArray.length()) {
+    savedCounts.add(historyArray.getString(i))
+}
 
         createInterface()
 
