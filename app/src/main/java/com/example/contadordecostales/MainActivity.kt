@@ -259,6 +259,18 @@ pauseButton = makeButton(
 
         rowOne.addView(pauseButton)
         rowOne.addView(resetButton)
+        
+        val saveRow = LinearLayout(this).apply {
+    orientation = LinearLayout.HORIZONTAL
+}
+
+val saveButton = makeButton(
+    "GUARDAR CONTEO", Color.rgb(22, 163, 74)
+) {
+    showSaveCountDialog()
+}
+
+saveRow.addView(saveButton)
 
         val rowTwo = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
