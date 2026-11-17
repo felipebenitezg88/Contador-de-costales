@@ -325,6 +325,7 @@ saveRow.addView(saveButton)
             }
         )
         root.addView(rowOne)
+        root.addView(saveRow)
         root.addView(rowTwo)
 
         setContentView(root)
