@@ -285,21 +285,13 @@ saveRow.addView(saveButton)
         val historyButton = makeButton(
             "HISTORIAL", Color.rgb(38, 55, 70)
         ) {
-            AlertDialog.Builder(this)
-                .setTitle("Historial")
-                .setMessage("El historial de producción se agregará en la siguiente actualización.")
-                .setPositiveButton("Aceptar", null)
-                .show()
+            showHistory()
         }
 
         val reportsButton = makeButton(
             "REPORTES", Color.rgb(38, 55, 70)
         ) {
-            AlertDialog.Builder(this)
-                .setTitle("Reportes")
-                .setMessage("Los reportes de producción se agregarán en la siguiente actualización.")
-                .setPositiveButton("Aceptar", null)
-                .show()
+            showReports()
         }
 
         rowTwo.addView(settingsButton)
@@ -462,6 +454,66 @@ private fun showSaveCountDialog() {
 
     dialog.show()
 }
+
+    private fun showHistory() {
+        val records = savedCounts.mapNotNull { raw ->
+            try { JSONObject(raw) } catch (_: Exception) { null }
+        }.reversed()
+
+        if (records.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Historial de producción")
+                .setMessage("Todavía no hay conteos guardados. Usa GUARDAR CONTEO para registrar una producción.")
+                .setPositiveButton("Aceptar", null)
+                .show()
+            return
+        }
+
+        val items = records.map { record ->
+            val fecha = record.optString("fecha", "Sin fecha")
+            val total = record.optInt("totalNeto", 0)
+            val cuadrilla = record.optString("cuadrilla", "Sin cuadrilla")
+            val estiba = record.optString("estiba", "Sin estiba")
+            "$fecha\nTotal neto: $total | Cuadrilla: $cuadrilla | Estiba: $estiba"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("Historial de producción (" + records.size + ")")
+            .setItems(items, null)
+            .setPositiveButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showReports() {
+        val records = savedCounts.mapNotNull { raw ->
+            try { JSONObject(raw) } catch (_: Exception) { null }
+        }
+
+        if (records.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Reportes de producción")
+                .setMessage("Aún no hay registros para generar un reporte.")
+                .setPositiveButton("Aceptar", null)
+                .show()
+            return
+        }
+
+        val totalOriginal = records.sumOf { it.optInt("conteoOriginal", 0) }
+        val rotosOrigen = records.sumOf { it.optInt("rotosOrigen", 0) }
+        val rotosManiobra = records.sumOf { it.optInt("rotosManiobra", 0) }
+        val totalNeto = records.sumOf { it.optInt("totalNeto", 0) }
+        val texto = "Registros guardados: " + records.size + "\n" +
+            "Costales detectados: $totalOriginal\n" +
+            "Rotos de origen: $rotosOrigen\n" +
+            "Rotos por maniobra: $rotosManiobra\n" +
+            "TOTAL NETO DE PRODUCCIÓN: $totalNeto"
+
+        AlertDialog.Builder(this)
+            .setTitle("Reporte acumulado")
+            .setMessage(texto)
+            .setPositiveButton("Aceptar", null)
+            .show()
+    }
 
     private fun showSettings() {
         val content = LinearLayout(this).apply {
