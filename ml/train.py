@@ -11,7 +11,7 @@ from pathlib import Path
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASET = ROOT / "dataset" / "costales"
+DATASET = ROOT / "ml" / "dataset" / "costales"
 DATA_YAML = ROOT / "ml" / "data.yaml"
 
 
