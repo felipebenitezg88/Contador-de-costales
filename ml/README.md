@@ -17,7 +17,7 @@ Este directorio contiene la configuración inicial para entrenar un detector de 
 ## Estructura esperada
 
 ```
-dataset/costales/
+ml/dataset/costales/
   images/
     train/
     val/
