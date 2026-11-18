@@ -5,6 +5,7 @@ on:
     paths:
       - "ml/dataset/costales/videos/raw/**"
       - "ml/extract_frames.py"
+      - ".github/workflows/extract-costal-frames.yml"
 permissions:
   contents: write
 jobs:
