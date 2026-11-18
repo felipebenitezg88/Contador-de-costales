@@ -5,11 +5,15 @@ on:
     paths:
       - "ml/dataset/costales/videos/raw/**"
       - "ml/extract_frames.py"
+permissions:
+  contents: write
 jobs:
   extract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -24,3 +28,14 @@ jobs:
           path: ml/dataset/costales/frames/review/
           if-no-files-found: error
           retention-days: 30
+      - name: Publicar fotogramas en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ml/dataset/costales/frames/review/
+          if git diff --cached --quiet; then
+            echo "No hay fotogramas nuevos."
+          else
+            git commit -m "Publicar fotogramas extraídos para etiquetado"
+            git push
+          fi
