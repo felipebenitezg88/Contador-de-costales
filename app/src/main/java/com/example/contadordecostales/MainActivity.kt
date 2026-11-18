@@ -266,6 +266,10 @@ pauseButton = makeButton(
         if (isCounting) "PAUSAR" else "REANUDAR"
     statusText.text =
         if (isCounting) "Conteo activo" else "Conteo pausado"
+    if (!isCounting) {
+        val currentCount = synchronized(stateLock) { totalCount }
+        updateProductionIndicators(currentCount, 0)
+    }
 }
 
         val resetButton = makeButton(
@@ -702,54 +706,57 @@ private fun showSaveCountDialog() {
 
                         detector.process(inputImage)
                             .addOnSuccessListener(cameraExecutor) { objects ->
-                                if (!isCounting) return@addOnSuccessListener
-
                                 var newCount = -1
+                                var currentCount = 0
                                 var newSpeed = 0
 
                                 synchronized(stateLock) {
                                     val now = android.os.SystemClock.elapsedRealtime()
                                     countTimestamps.removeAll { now - it > 60_000L }
-                                    for (obj in objects) {
-                                        val id = obj.trackingId ?: continue
-                                        val box = obj.boundingBox
 
-                                        val areaRatio =
-                                            (box.width().toFloat() *
-                                             box.height().toFloat()) /
-                                            (imageWidth.toFloat() *
-                                             imageHeight.toFloat())
+                                    if (isCounting) {
+                                        for (obj in objects) {
+                                            val id = obj.trackingId ?: continue
+                                            val box = obj.boundingBox
 
-                                        if (areaRatio < sensitivity / 1000f) {
-                                            continue
+                                            val areaRatio =
+                                                (box.width().toFloat() *
+                                                 box.height().toFloat()) /
+                                                (imageWidth.toFloat() *
+                                                 imageHeight.toFloat())
+
+                                            if (areaRatio < sensitivity / 1000f) {
+                                                continue
+                                            }
+
+                                            val lineX =
+                                                imageWidth * linePosition / 100f
+                                            val isRightSide =
+                                                box.centerX() >= lineX
+
+                                            val previous = previousSides[id]
+
+                                            if (previous != null &&
+                                                previous != isRightSide &&
+                                                !countedIds.contains(id)
+                                            ) {
+                                                totalCount++
+                                                countTimestamps.add(now)
+                                                countedIds.add(id)
+                                                newCount = totalCount
+                                            }
+
+                                            previousSides[id] = isRightSide
                                         }
-
-                                        val lineX =
-                                            imageWidth * linePosition / 100f
-                                        val isRightSide =
-                                            box.centerX() >= lineX
-
-                                        val previous = previousSides[id]
-
-                                        if (previous != null &&
-                                            previous != isRightSide &&
-                                            !countedIds.contains(id)
-                                        ) {
-                                            totalCount++
-                                            countTimestamps.add(android.os.SystemClock.elapsedRealtime())
-                                            countedIds.add(id)
-                                            newCount = totalCount
-                                            newSpeed = countTimestamps.size
-                                        }
-
-                                        previousSides[id] = isRightSide
                                     }
+
+                                    currentCount = totalCount
+                                    newSpeed = countTimestamps.size
                                 }
 
-                                if (newCount >= 0) {
-                                    runOnUiThread {
+                                runOnUiThread {
+                                    if (newCount >= 0) {
                                         countText.text = newCount.toString()
-                                        updateProductionIndicators(newCount, newSpeed)
                                         if (soundEnabled) {
                                             toneGenerator?.startTone(
                                                 ToneGenerator.TONE_PROP_BEEP,
@@ -757,6 +764,7 @@ private fun showSaveCountDialog() {
                                             )
                                         }
                                     }
+                                    updateProductionIndicators(currentCount, newSpeed)
                                 }
                             }
                             .addOnFailureListener(cameraExecutor) {
