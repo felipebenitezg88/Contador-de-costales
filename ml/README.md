@@ -30,13 +30,13 @@ Cada imagen debe tener un archivo de etiqueta YOLO con el mismo nombre base. La 
 
 ## Reglas de etiquetado
 
-1. Dibujar una caja independiente por cada costal visible que esté pasando por la banda.
+1. Dibujar una caja independiente por cada costal visible y distinguible, también cuando esté apilado o fuera de la futura zona de conteo.
 2. Incluir costales blancos lisos, impresos con cualquier color, con franjas o sin ellas.
 3. Incluir distintas orientaciones, deformaciones, distancias e iluminación.
 4. Si un costal está parcialmente tapado, etiquetar la parte visible del costal; no inventar el contorno oculto.
 5. Etiquetar por separado dos costales que se tocan o están muy juntos, siempre que se distingan visualmente.
 6. No etiquetar estructuras, rodillos, banda transportadora, personas ni objetos que no sean costales.
-7. Los costales del fondo o apilados que no estén pasando por la zona de conteo no deben formar parte de los positivos de operación; reservar escenas difíciles como negativos/contexto según la estrategia de validación.
+7. La zona de conteo se limitará después mediante la lógica de seguimiento y línea virtual; no se debe enseñar al detector a ignorar costales reales por su ubicación.
 8. Evitar que fotogramas casi idénticos del mismo tramo de video queden repartidos entre entrenamiento y validación. Separar por video o por secuencia para evitar fuga de datos.
 
 ## Entrenar
