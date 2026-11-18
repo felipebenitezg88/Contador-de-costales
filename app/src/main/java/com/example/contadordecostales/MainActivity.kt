@@ -41,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var countText: TextView
     private lateinit var statusText: TextView
+    private lateinit var metricsText: TextView
+    private lateinit var speedText: TextView
     private lateinit var cameraExecutor: ExecutorService
 
     private val preferences by lazy {
@@ -50,8 +52,10 @@ class MainActivity : AppCompatActivity() {
     private var linePosition = 50
     private var sensitivity = 2
     private var soundEnabled = true
+    private var productionGoal = 1000
 
     private var totalCount = 0
+    private val countTimestamps = mutableListOf<Long>()
 
 @Volatile
 private var isCounting = true
@@ -100,6 +104,7 @@ if (android.os.Build.VERSION.SDK_INT >= 29) {
         linePosition = preferences.getInt("line_position", 50)
         sensitivity = preferences.getInt("sensitivity", 2)
         soundEnabled = preferences.getBoolean("sound_enabled", true)
+        productionGoal = preferences.getInt("production_goal", 1000).coerceAtLeast(1)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
         toneGenerator = ToneGenerator(
@@ -201,8 +206,26 @@ for (i in 0 until historyArray.length()) {
             setPadding(0, dp(3), 0, dp(3))
         }
 
+        metricsText = TextView(this).apply {
+            text = "Meta: $productionGoal | Avance: 0%"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(2), 0, dp(2))
+        }
+
+        speedText = TextView(this).apply {
+            text = "Velocidad: 0 costales/min"
+            textSize = 13f
+            setTextColor(Color.rgb(125, 211, 252))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(2), 0, dp(2))
+        }
+
         counterCard.addView(counterLabel)
         counterCard.addView(countText)
+        counterCard.addView(metricsText)
+        counterCard.addView(speedText)
         counterCard.addView(statusText)
 
         val cameraLabel = TextView(this).apply {
@@ -250,10 +273,13 @@ pauseButton = makeButton(
         ) {
             synchronized(stateLock) {
                 totalCount = 0
+                countTimestamps.clear()
                 previousSides.clear()
                 countedIds.clear()
             }
             countText.text = "0"
+            metricsText.text = "Meta: $productionGoal | Avance: 0%"
+            speedText.text = "Velocidad: 0 costales/min"
             statusText.text = "Contador reiniciado"
         }
 
@@ -569,6 +595,20 @@ private fun showSaveCountDialog() {
             }
         )
 
+        val goalLabel = TextView(this).apply {
+            text = "Meta diaria de producción (costales)"
+            textSize = 14f
+            setTextColor(Color.BLACK)
+        }
+        content.addView(goalLabel)
+
+        val goalInput = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(productionGoal.toString())
+            hint = "Ej. 1000"
+        }
+        content.addView(goalInput)
+
         val soundSwitch = Switch(this).apply {
             text = "Sonido al contar"
             isChecked = soundEnabled
@@ -583,12 +623,22 @@ private fun showSaveCountDialog() {
                 linePosition = lineBar.progress + 20
                 sensitivity = sensitivityBar.progress + 1
                 soundEnabled = soundSwitch.isChecked
+                productionGoal = (goalInput.text.toString().toIntOrNull() ?: productionGoal).coerceAtLeast(1)
 
                 preferences.edit()
                     .putInt("line_position", linePosition)
                     .putInt("sensitivity", sensitivity)
                     .putBoolean("sound_enabled", soundEnabled)
+                    .putInt("production_goal", productionGoal)
                     .apply()
+
+                val currentCount = synchronized(stateLock) { totalCount }
+                val currentSpeed = synchronized(stateLock) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    countTimestamps.removeAll { now - it > 60_000L }
+                    countTimestamps.size
+                }
+                updateProductionIndicators(currentCount, currentSpeed)
 
                 synchronized(stateLock) {
                     previousSides.clear()
@@ -598,6 +648,12 @@ private fun showSaveCountDialog() {
                 statusText.text = "Configuración guardada"
             }
             .show()
+    }
+
+    private fun updateProductionIndicators(count: Int, speedPerMinute: Int) {
+        val percent = ((count.toDouble() / productionGoal.toDouble()) * 100.0).toInt()
+        metricsText.text = "Meta: $productionGoal | Avance: $percent%"
+        speedText.text = "Velocidad: $speedPerMinute costales/min"
     }
 
     private fun startCamera() {
@@ -649,8 +705,11 @@ private fun showSaveCountDialog() {
                                 if (!isCounting) return@addOnSuccessListener
 
                                 var newCount = -1
+                                var newSpeed = 0
 
                                 synchronized(stateLock) {
+                                    val now = android.os.SystemClock.elapsedRealtime()
+                                    countTimestamps.removeAll { now - it > 60_000L }
                                     for (obj in objects) {
                                         val id = obj.trackingId ?: continue
                                         val box = obj.boundingBox
@@ -677,8 +736,10 @@ private fun showSaveCountDialog() {
                                             !countedIds.contains(id)
                                         ) {
                                             totalCount++
+                                            countTimestamps.add(android.os.SystemClock.elapsedRealtime())
                                             countedIds.add(id)
                                             newCount = totalCount
+                                            newSpeed = countTimestamps.size
                                         }
 
                                         previousSides[id] = isRightSide
@@ -688,6 +749,7 @@ private fun showSaveCountDialog() {
                                 if (newCount >= 0) {
                                     runOnUiThread {
                                         countText.text = newCount.toString()
+                                        updateProductionIndicators(newCount, newSpeed)
                                         if (soundEnabled) {
                                             toneGenerator?.startTone(
                                                 ToneGenerator.TONE_PROP_BEEP,
