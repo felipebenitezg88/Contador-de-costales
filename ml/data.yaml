@@ -1,0 +1,8 @@
+# Dataset YOLO para el detector especializado CONSEDE.
+# Las rutas son relativas a la raíz del repositorio.
+path: dataset/costales
+train: images/train
+val: images/val
+
+names:
+  0: costal
