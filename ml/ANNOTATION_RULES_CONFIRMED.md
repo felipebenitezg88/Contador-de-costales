@@ -1,27 +1,28 @@
-# Reglas confirmadas para etiquetar costales CONSEDE
+# Reglas confirmadas para segmentar costales CONSEDE
 
-Estas reglas se aplican al dataset de detección YOLO de una sola clase: `costal`.
+Estas reglas se aplican al dataset YOLO Segmentation de una sola clase: `costal`.
 
 ## Criterio visual
 - Identificar cada costal por su forma, volumen, dimensiones y apariencia física.
 - No depender de logotipos, texto (por ejemplo, Pantaleon), franjas ni colores impresos: pueden faltar, cambiar o no ser visibles.
 - El fondo, la banda transportadora, rodillos, pallets y maquinaria no son objetos de la clase.
 
-## Cajas delimitadoras
-- Dibujar una caja por cada costal que pueda distinguirse como una unidad.
-- Ajustar la caja al contorno visible del costal, sin incluir grandes áreas del transportador o del fondo.
-- No duplicar un mismo costal ni usar una caja conjunta para varios costales separados.
-- Cuando dos costales se tocan o se superponen, mantener una caja por instancia; se permite que las cajas se solapen si los objetos realmente se solapan.
-- Para costales parcialmente ocultos, anotar sólo cuando su identidad y extensión visible permitan delimitar una instancia razonablemente. No inventar los límites ocultos.
-- Si no es posible separar con confianza dos costales apilados, no crear cajas arbitrarias para esa región.
+## Polígonos por instancia
+- Dibujar un polígono independiente por cada costal que pueda distinguirse como una unidad.
+- Ajustar el polígono al contorno físico visible, siguiendo pliegues generales y deformaciones sin sobreajustar arrugas pequeñas.
+- No duplicar un mismo costal ni usar un polígono conjunto para varios costales separados.
+- Cuando dos costales se tocan o se superponen, mantener una máscara por instancia si sus límites visibles permiten separarlos.
+- Para costales parcialmente ocultos, anotar sólo la región visible; no inventar límites ocultos.
+- Si no es posible separar con confianza dos costales apilados, marcar la imagen para revisión y no crear polígonos arbitrarios.
 
 ## Formato
-- Formato YOLO: `class_id x_center y_center width height`, coordenadas normalizadas entre 0 y 1.
+- Formato Ultralytics YOLO Segmentation: `class_id x1 y1 x2 y2 ...`, coordenadas normalizadas.
 - Única clase: `0 costal`.
-- Cada imagen debe tener su archivo .txt correspondiente, incluso si no contiene instancias (archivo vacío).
-- Las capturas de pantalla con rectángulos rojos aportadas como ejemplo sirven como referencia de criterio; no deben incorporarse como imágenes de entrenamiento porque los rectángulos y la interfaz contaminarían la apariencia visual que aprenderá el modelo.
+- Cada polígono debe contener al menos tres pares de coordenadas.
+- Cada imagen debe tener su archivo .txt correspondiente, incluso si está vacío.
+- Las capturas de pantalla con rectángulos o interfaz no deben incorporarse como imágenes de entrenamiento.
 
 ## Control de calidad
-- Revisar visualmente cada imagen junto con sus cajas antes de incluirla en train o val.
-- Separar entrenamiento y validación por video/secuencia para evitar fotogramas casi idénticos en ambos conjuntos.
-- No iniciar entrenamiento hasta que las imágenes y etiquetas reales superen la validación del dataset.
+- Revisar visualmente cada máscara sobre su imagen antes de incluirla en train o val.
+- Separar entrenamiento y validación por video/secuencia.
+- No iniciar entrenamiento hasta que las imágenes y polígonos reales superen la validación estructural y visual.
