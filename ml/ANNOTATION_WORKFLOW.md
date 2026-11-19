@@ -31,3 +31,18 @@ Al exportar, colocar imágenes y archivos TXT en:
 
 ## Estado
 Este flujo no contiene etiquetas inventadas. El manifest registra las 114 imágenes como pendientes hasta que se anoten y revisen.
+
+
+## Importar la exportación de CVAT sin mezclar vídeos
+El repositorio incluye `ml/import_cvat_export.py`. Después de extraer el ZIP de CVAT, ubica las carpetas que contienen las imágenes y los TXT YOLO (pueden estar dentro de subcarpetas) y ejecuta desde la raíz del repositorio:
+
+```bash
+python ml/import_cvat_export.py \
+  --manifest ml/ANNOTATION_MANIFEST.csv \
+  --images RUTA/A/IMAGENES \
+  --labels RUTA/A/ETIQUETAS \
+  --output ml/dataset/costales
+python ml/validate_dataset.py
+```
+
+El importador exige que estén las 114 imágenes y sus 114 TXT correspondientes (un TXT vacío es válido cuando una imagen no contiene costales identificables), comprueba que sólo exista la clase 0 y aplica automáticamente la separación train/val del manifest por vídeo. Si falta una etiqueta o hay una caja inválida, se detiene y reporta el problema. No sobrescribas anotaciones manuales sin conservar una copia de la exportación original.
