@@ -46,3 +46,17 @@ python ml/validate_dataset.py
 ```
 
 El importador exige que estén las 114 imágenes y sus 114 TXT correspondientes (un TXT vacío es válido cuando una imagen no contiene costales identificables), comprueba que sólo exista la clase 0 y aplica automáticamente la separación train/val del manifest por vídeo. Si falta una etiqueta o hay una caja inválida, se detiene y reporta el problema. No sobrescribas anotaciones manuales sin conservar una copia de la exportación original.
+
+
+## Evaluación posterior al entrenamiento con vídeos completos
+Cuando `ml/train.py` haya generado `runs/conseDe_costales/weights/best.pt`, evaluar cada vídeo completo (no sólo los fotogramas de entrenamiento):
+
+```bash
+python ml/evaluate_videos.py \
+  --weights runs/conseDe_costales/weights/best.pt \
+  --videos /ruta/video1.mp4 /ruta/video2.mp4 \
+  --output runs/video_evaluation \
+  --line 50 --conf 0.25
+```
+
+El script genera vídeos anotados y `video_evaluation.json` con FPS de inferencia y tracks únicos que cruzan la línea. La cifra automática debe compararse con un conteo manual de referencia en cada vídeo; revisar especialmente oclusiones, tracks que se pierden o se reasignan y costales que retroceden. Esta evaluación no se considera aprobada sólo por completar la ejecución.
