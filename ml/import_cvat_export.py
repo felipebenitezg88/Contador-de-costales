@@ -73,6 +73,8 @@ def import_dataset(manifest: Path, source_images: Path, source_labels: Path, out
     overlap = videos_by_split["train"] & videos_by_split["val"]
     if overlap:
         raise ValueError("Fuga de videos entre train y val: " + ", ".join(sorted(overlap)))
+    if output.exists() and any(output.rglob("*")):
+        raise ValueError(f"El destino {output} no está vacío. Haz una copia y limpia el destino antes de importar para evitar mezclar etiquetas antiguas.")
 
     for row in rows:
         split = row["proposed_split"].strip()
