@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -44,6 +46,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var metricsText: TextView
     private lateinit var speedText: TextView
     private lateinit var cameraExecutor: ExecutorService
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val speedRefreshTask = object : Runnable {
+        override fun run() {
+            if (!isFinishing && !isDestroyed) {
+                refreshLiveIndicators()
+                mainHandler.postDelayed(this, 1000L)
+            }
+        }
+    }
 
     private val preferences by lazy {
         getSharedPreferences("contador_config", MODE_PRIVATE)
@@ -121,6 +132,7 @@ for (i in 0 until historyArray.length()) {
 }
 
         createInterface()
+        mainHandler.post(speedRefreshTask)
 
         if (ContextCompat.checkSelfPermission(
                 this, Manifest.permission.CAMERA
@@ -266,10 +278,7 @@ pauseButton = makeButton(
         if (isCounting) "PAUSAR" else "REANUDAR"
     statusText.text =
         if (isCounting) "Conteo activo" else "Conteo pausado"
-    if (!isCounting) {
-        val currentCount = synchronized(stateLock) { totalCount }
-        updateProductionIndicators(currentCount, 0)
-    }
+    refreshLiveIndicators()
 }
 
         val resetButton = makeButton(
@@ -636,13 +645,7 @@ private fun showSaveCountDialog() {
                     .putInt("production_goal", productionGoal)
                     .apply()
 
-                val currentCount = synchronized(stateLock) { totalCount }
-                val currentSpeed = synchronized(stateLock) {
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    countTimestamps.removeAll { now - it > 60_000L }
-                    countTimestamps.size
-                }
-                updateProductionIndicators(currentCount, currentSpeed)
+                refreshLiveIndicators()
 
                 synchronized(stateLock) {
                     previousSides.clear()
@@ -654,10 +657,19 @@ private fun showSaveCountDialog() {
             .show()
     }
 
+    private fun refreshLiveIndicators() {
+        val snapshot = synchronized(stateLock) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            countTimestamps.removeAll { now - it >= 60_000L }
+            totalCount to countTimestamps.size
+        }
+        updateProductionIndicators(snapshot.first, snapshot.second)
+    }
+
     private fun updateProductionIndicators(count: Int, speedPerMinute: Int) {
         val percent = ((count.toDouble() / productionGoal.toDouble()) * 100.0).toInt()
         metricsText.text = "Meta: $productionGoal | Avance: $percent%"
-        speedText.text = "Velocidad: $speedPerMinute costales/min"
+        speedText.text = "Velocidad (últimos 60 s): $speedPerMinute costales/min"
     }
 
     private fun startCamera() {
@@ -800,6 +812,7 @@ private fun showSaveCountDialog() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacks(speedRefreshTask)
 
         if (::cameraExecutor.isInitialized) {
             cameraExecutor.shutdown()
