@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Importa etiquetas YOLO exportadas desde CVAT y aplica el split por video del manifest."""
+"""Importa etiquetas YOLO-seg y aplica el split por video del manifest."""
 from __future__ import annotations
 import argparse
 import csv
@@ -26,17 +26,17 @@ def index_files(folder: Path, extensions: set[str]) -> dict[str, Path]:
 def validate_label(path: Path) -> tuple[bool, str]:
     for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
         fields = line.split()
-        if len(fields) != 5:
-            return False, f"{path.name}:{number}: se esperan 5 campos YOLO"
+        if len(fields) < 7 or len(fields) % 2 == 0:
+            return False, f"{path.name}:{number}: YOLO-seg requiere clase y al menos 3 pares x,y"
         try:
             cls = int(fields[0])
-            x, y, w, h = map(float, fields[1:])
+            coords = list(map(float, fields[1:]))
         except ValueError:
             return False, f"{path.name}:{number}: valores no numéricos"
         if cls != 0:
             return False, f"{path.name}:{number}: clase {cls}; debe ser 0 (costal)"
-        if not all(0.0 <= v <= 1.0 for v in (x, y, w, h)) or w <= 0 or h <= 0:
-            return False, f"{path.name}:{number}: caja fuera de rango o sin área"
+        if len(coords) < 6 or len(coords) % 2 or any(not 0.0 <= v <= 1.0 for v in coords):
+            return False, f"{path.name}:{number}: coordenadas de polígono inválidas"
     return True, ""
 
 
@@ -87,7 +87,7 @@ def import_dataset(manifest: Path, source_images: Path, source_labels: Path, out
         shutil.copy2(image_src, image_dst)
         shutil.copy2(label_src, label_dst)
 
-    print(f"Importación completada: {len(rows)} imágenes con etiqueta YOLO.")
+    print(f"Importación completada: {len(rows)} imágenes con etiquetas YOLO-seg.")
     print(f"Train: {sum(r['proposed_split'].strip() == 'train' for r in rows)} imágenes; videos: {len(videos_by_split['train'])}")
     print(f"Val: {sum(r['proposed_split'].strip() == 'val' for r in rows)} imágenes; videos: {len(videos_by_split['val'])}")
     print(f"Dataset: {output}")
@@ -97,8 +97,8 @@ def import_dataset(manifest: Path, source_images: Path, source_labels: Path, out
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--images", type=Path, required=True, help="Carpeta de imágenes exportadas desde CVAT")
-    parser.add_argument("--labels", type=Path, required=True, help="Carpeta de etiquetas .txt exportadas desde CVAT")
+    parser.add_argument("--images", type=Path, required=True, help="Carpeta de imágenes")
+    parser.add_argument("--labels", type=Path, required=True, help="Carpeta de etiquetas YOLO-seg exportadas")
     parser.add_argument("--output", type=Path, required=True, help="Destino ml/dataset/costales")
     args = parser.parse_args()
     try:
