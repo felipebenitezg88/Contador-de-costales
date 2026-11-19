@@ -1,40 +1,33 @@
 # Flujo de anotación visual CONSEDE
 
 ## Objetivo
-Crear etiquetas YOLO Detection para una única clase: `costal` (clase 0), usando los 114 fotogramas originales del paquete de anotación.
+Crear polígonos YOLO Segmentation para una única clase: `costal` (clase 0), usando los 114 fotogramas del paquete de anotación.
 
-## Importar a CVAT
-1. Crear un proyecto o tarea de tipo **Object Detection**.
-2. Cargar las 114 imágenes del ZIP de preparación.
-3. Crear una etiqueta llamada exactamente `costal`.
-4. Dibujar un rectángulo por cada costal identificable en cada imagen.
-5. Ajustar la caja al área visible del costal; si está parcialmente oculto, no inventar la parte tapada.
-6. No etiquetar rodillos, bandas, pallets, personas, maquinaria ni fondo.
-7. No usar franjas, marcas o texto como criterio para decidir si es costal.
-8. Exportar como **Ultralytics YOLO Detection**.
+## Etiquetado con el editor CONSEDE
+1. Abrir el archivo HTML del etiquetador de contornos en Chrome.
+2. Recorrer los 114 fotogramas.
+3. Tocar sobre el borde del costal para agregar vértices y cerrar el polígono.
+4. Dibujar un polígono por cada costal individualmente distinguible.
+5. Seguir sólo el contorno visible; no completar partes ocultas por imaginación.
+6. Marcar para revisión los fotogramas donde no se pueda separar con confianza cada costal.
+7. No etiquetar rodillos, bandas, pallets, personas, maquinaria ni fondo.
+8. Exportar las etiquetas YOLO Segmentation y conservar también el respaldo JSON.
 
 ## División de datos
-La propuesta está en `ANNOTATION_MANIFEST.csv`: WA0161 y WA0167 se reservan para validación; los otros ocho vídeos para entrenamiento. La separación es por vídeo completo para evitar fuga entre fotogramas de una misma secuencia.
-
-Al exportar, colocar imágenes y archivos TXT en:
-- `ml/dataset/costales/images/train/`
-- `ml/dataset/costales/labels/train/`
-- `ml/dataset/costales/images/val/`
-- `ml/dataset/costales/labels/val/`
+La propuesta está en `ANNOTATION_MANIFEST.csv`: WA0161 y WA0167 se reservan para validación; los otros ocho videos para entrenamiento. La separación es por video completo para evitar fuga entre fotogramas de una misma secuencia.
 
 ## Control de calidad
-- Cada imagen debe tener un TXT del mismo nombre; los TXT pueden estar vacíos si no hay costales identificables.
-- Cada línea YOLO debe tener cinco valores: `0 x_centro y_centro ancho alto`, normalizados entre 0 y 1.
-- Revisar manualmente cajas cortadas, costales juntos, solapamientos y falsos objetos.
+- Cada imagen debe tener un TXT del mismo nombre; los TXT vacíos son válidos si no hay costales visibles.
+- Cada línea debe contener clase 0 seguida de al menos tres pares x,y normalizados.
+- Revisar manualmente contornos cortados, costales juntos, oclusiones y falsos objetos.
 - Ejecutar `python ml/validate_dataset.py`.
-- No iniciar entrenamiento hasta que la validación estructural pase y las cajas hayan sido revisadas visualmente.
+- No iniciar entrenamiento hasta que la validación estructural pase y las máscaras hayan sido revisadas visualmente.
 
 ## Estado
-Este flujo no contiene etiquetas inventadas. El manifest registra las 114 imágenes como pendientes hasta que se anoten y revisen.
+La revisión visual de contacto permite reconocer escenarios y fotogramas difíciles, pero no sustituye la creación y revisión de los 114 polígonos. No considerar completo el dataset hasta que el editor exporte las etiquetas y el control de calidad se haya realizado.
 
-
-## Importar la exportación de CVAT sin mezclar vídeos
-El repositorio incluye `ml/import_cvat_export.py`. Después de extraer el ZIP de CVAT, ubica las carpetas que contienen las imágenes y los TXT YOLO (pueden estar dentro de subcarpetas) y ejecuta desde la raíz del repositorio:
+## Importar la exportación
+Después de exportar, extraer el ZIP y ejecutar desde la raíz del repositorio:
 
 ```bash
 python ml/import_cvat_export.py \
@@ -45,18 +38,17 @@ python ml/import_cvat_export.py \
 python ml/validate_dataset.py
 ```
 
-El importador exige que estén las 114 imágenes y sus 114 TXT correspondientes (un TXT vacío es válido cuando una imagen no contiene costales identificables), comprueba que sólo exista la clase 0 y aplica automáticamente la separación train/val del manifest por vídeo. Si falta una etiqueta o hay una caja inválida, se detiene y reporta el problema. No sobrescribas anotaciones manuales sin conservar una copia de la exportación original.
+El importador exige las 114 imágenes y sus 114 TXT, comprueba la clase y la geometría de los polígonos, y aplica la separación train/val del manifest. No sobrescribir anotaciones manuales sin conservar una copia.
 
-
-## Evaluación posterior al entrenamiento con vídeos completos
-Cuando `ml/train.py` haya generado `runs/conseDe_costales/weights/best.pt`, evaluar cada vídeo completo (no sólo los fotogramas de entrenamiento):
+## Evaluación posterior al entrenamiento
+Cuando `ml/train.py` genere `runs/conseDe_costales_seg/weights/best.pt`, evaluar videos completos:
 
 ```bash
 python ml/evaluate_videos.py \
-  --weights runs/conseDe_costales/weights/best.pt \
+  --weights runs/conseDe_costales_seg/weights/best.pt \
   --videos /ruta/video1.mp4 /ruta/video2.mp4 \
   --output runs/video_evaluation \
   --line 50 --conf 0.25
 ```
 
-El script genera vídeos anotados y `video_evaluation.json` con FPS de inferencia y tracks únicos que cruzan la línea. La cifra automática debe compararse con un conteo manual de referencia en cada vídeo; revisar especialmente oclusiones, tracks que se pierden o se reasignan y costales que retroceden. Esta evaluación no se considera aprobada sólo por completar la ejecución.
+Revisar los videos anotados y comparar el conteo automático con un conteo manual de referencia. La ejecución del script por sí sola no demuestra precisión suficiente.
