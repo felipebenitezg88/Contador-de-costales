@@ -1,32 +1,30 @@
-# Guía de etiquetado del detector CONSEDE
+# Guía de etiquetado de segmentación CONSEDE
 
 ## Material fuente
-Los 10 videos originales están en `ml/dataset/costales/videos/raw/`. La extracción automática produjo un artefacto de 114 fotogramas para revisión, llamado `costales-fotogramas-para-etiquetar`, en GitHub Actions.
+El paquete de anotación contiene 114 fotogramas extraídos de 10 videos. El etiquetador HTML de contornos permite dibujar polígonos directamente sobre cada imagen y exportar YOLO Segmentation.
 
 ## Etiquetado requerido
-Usar CVAT, Label Studio u otra herramienta compatible con YOLO Detection. Crear una sola clase, exactamente `costal` (índice 0). Exportar en formato Ultralytics YOLO.
+Usar una sola clase, exactamente `costal` (índice 0), en formato **Ultralytics YOLO Segmentation**.
 
-- Una caja por costal identificable.
+- Dibujar un polígono independiente por cada costal identificable.
+- Seguir el contorno físico visible; usar suficientes vértices para representar costales deformados y orientados de distintas formas.
 - No basarse en franjas, colores, marcas ni texto impreso.
-- Incluir sacos lisos y estampados, juntos, deformados y parcialmente ocultos.
-- En oclusión, encerrar sólo la parte visible del saco.
-- No etiquetar banda, rodillos, pallets, personas ni maquinaria.
-- Si dos sacos se tocan, separarlos en cajas distintas cuando sus límites sean distinguibles.
-- No inventar cajas para objetos ambiguos.
+- Incluir costales lisos y estampados, deformados y parcialmente ocultos cuando su región visible sea distinguible.
+- En oclusión, etiquetar únicamente la superficie visible; no inventar el contorno oculto.
+- No etiquetar banda, rodillos, pallets, personas, maquinaria ni fondo.
+- Si dos costales se tocan, separarlos en polígonos distintos sólo cuando el límite entre ambos sea identificable.
+- Marcar para revisión cualquier fotograma ambiguo; no inventar polígonos.
+- Un fotograma sin costales visibles debe tener un TXT vacío.
 
 ## División sin fuga de datos
-Separar por video completo, no por fotogramas aleatorios. Ningún video fuente puede aparecer simultáneamente en train y val. Distribuir videos distintos entre ambos conjuntos y conservar escenas difíciles para validación.
+Separar por video completo, no por fotogramas aleatorios. Ningún video fuente puede aparecer simultáneamente en train y val. El manifest reserva WA0161 y WA0167 para validación y los demás videos para entrenamiento.
 
-## Estructura de entrega
-Copiar imágenes y etiquetas con el mismo nombre base:
-```
-ml/dataset/costales/
-  images/train/  labels/train/
-  images/val/    labels/val/
-```
-Cada imagen debe tener un .txt correspondiente. Cada línea debe ser `0 x_centro y_centro ancho alto`, con coordenadas normalizadas entre 0 y 1.
+## Formato YOLO Segmentation
+Cada imagen debe tener un TXT correspondiente. Cada instancia se escribe en una línea:
+`0 x1 y1 x2 y2 x3 y3 ...`
+Las coordenadas son pares x,y normalizados entre 0 y 1. Cada polígono requiere al menos tres puntos. La clase única es 0.
 
 ## Comprobación y entrenamiento
-Ejecutar `python ml/validate_dataset.py`. El validador exige al menos 20 imágenes y 50 cajas en train, 5 imágenes y 10 cajas en val, etiquetas válidas y separación por video. Después, ejecutar `python ml/train.py` o lanzar el workflow manualmente. El workflow guarda pesos, métricas y exportación TFLite como artefacto.
+Ejecutar `python ml/validate_dataset.py`. El validador comprueba los polígonos, la clase y la separación por video. Después, ejecutar `python ml/train.py` o lanzar el workflow manualmente. El entrenamiento usa YOLO11n-seg y genera métricas de cajas y máscaras, además de exportación TFLite.
 
-No considerar listo el modelo hasta probarlo sobre videos completos no usados en entrenamiento, revisando omisiones, falsos positivos, cajas duplicadas y costales muy juntos/ocultos.
+No considerar listo el modelo hasta probarlo sobre videos completos no usados en entrenamiento, revisando máscaras, omisiones, falsos positivos, instancias duplicadas y costales muy juntos u ocultos.
