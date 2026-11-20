@@ -1,6 +1,9 @@
 name: Descargar paquete de fotogramas CONSEDE
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/package-annotation-frames.yml"
 permissions:
   contents: read
 jobs:
