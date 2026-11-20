@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Etiquetador CONSEDE</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111827;color:#f9fafb;font:16px system-ui,sans-serif}header{padding:12px;background:#1f2937;position:sticky;top:0;z-index:5}h1{font-size:19px;margin:0 0 6px}p{margin:5px 0;font-size:13px;color:#d1d5db}.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}button,.pick{border:0;border-radius:9px;padding:10px 12px;font-weight:650;background:#374151;color:white;font-size:14px}button.primary{background:#0d9488}button.warn{background:#b45309}button:disabled{opacity:.35}#stage{padding:8px;display:flex;justify-content:center;align-items:center;min-height:48vh}canvas{max-width:100%;max-height:62vh;touch-action: none;background:#000;border-radius:8px}#status{padding:8px 12px;color:#a7f3d0;font-size:14px}#help{padding:8px 12px;font-size:13px;line-height:1.5;color:#d1d5db}.small{font-size:12px;color:#9ca3af}input{display:none}.row{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+<h1>Etiquetador de costales CONSEDE</h1>
+<p><b>Regla:</b> dibuja únicamente costales que estén sobre la banda. No marques pilas ni costales del fondo.</p>
+<div class="toolbar">
+<label class="pick" for="files">1. Cargar fotogramas</label><input id="files" type="file" accept="image/*" multiple>
+<button id="prev" disabled>◀ Anterior</button><button id="next" disabled>Siguiente ▶</button>
+<button id="undo" disabled>Deshacer punto</button><button id="close" class="primary" disabled>Cerrar polígono</button>
+<button id="empty" class="warn">Sin costales en banda</button>
+<button id="export" disabled>Exportar etiquetas ZIP</button>
+</div>
+</header>
+<div id="status">Carga las imágenes JPG extraídas de los videos para comenzar.</div>
+<div id="stage"><canvas id="cv" width="900" height="600"></canvas></div>
+<div id="help">
+<b>Cómo marcar:</b> toca la orilla del costal para agregar puntos; rodea todo el contorno visible y pulsa <b>Cerrar polígono</b>. Repite por cada costal que esté sobre la banda. Para terminar el fotograma sin objetos, pulsa <b>Sin costales en banda</b>. Los cambios se guardan temporalmente en este navegador mientras no borres sus datos.<br>
+<span class="small">Consejo: usa tantos puntos como necesite la forma; no incluyas rodillos, banda ni costales apilados fuera de ella.</span>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+const $=id=>document.getElementById(id), cv=$('cv'),ctx=cv.getContext('2d');
+let items=[],idx=0,points=[],polys=[],done=new Set(),img=null,scale=1,offset={x:0,y:0};
+function name(i){return items[i]?.name||''}
+function current(){return items[idx]}
+function status(){ $('status').textContent=items.length?('Fotograma '+(idx+1)+' de '+items.length+' · '+name(idx)+' · Polígonos: '+polys.length+(done.has(idx)?' · revisado':'')):'Carga las imágenes JPG extraídas de los videos para comenzar.'; $('prev').disabled=!items.length||idx===0;$('next').disabled=!items.length||idx===items.length-1;$('undo').disabled=!points.length;$('close').disabled=points.length<3;$('export').disabled=!items.length||done.size!==items.length;}
+function fit(){
+ if(!img)return;const maxW=Math.min(window.innerWidth-18,1100),maxH=Math.max(260,window.innerHeight*.60);
+ const s=Math.min(maxW/img.width,maxH/img.height);cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);scale=s;draw();
+}
+function draw(){
+ ctx.clearRect(0,0,cv.width,cv.height);if(!img)return;ctx.drawImage(img,0,0,cv.width,cv.height);
+ polys.forEach(poly=>{ctx.beginPath();poly.forEach((p,i)=>i?ctx.lineTo(p.x*cv.width,p.y*cv.height):ctx.moveTo(p.x*cv.width,p.y*cv.height));ctx.closePath();ctx.fillStyle='rgba(16,185,129,.22)';ctx.fill();ctx.strokeStyle='#34d399';ctx.lineWidth=3;ctx.stroke();});
+ if(points.length){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x*cv.width,p.y*cv.height):ctx.moveTo(p.x*cv.width,p.y*cv.height));ctx.strokeStyle='#facc15';ctx.lineWidth=3;ctx.stroke();points.forEach(p=>{ctx.beginPath();ctx.arc(p.x*cv.width,p.y*cv.height,5,0,Math.PI*2);ctx.fillStyle='#facc15';ctx.fill();});}
+}
+function load(){const it=current();if(!it)return;polys=it.polys||[];points=[];done=done;img=new Image();img.onload=()=>{fit();status()};img.src=it.url;status();}
+$('files').addEventListener('change',e=>{items=Array.from(e.target.files).filter(f=>f.type.startsWith('image/')).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(file=>({name:file.name,file,url:URL.createObjectURL(file),polys:[]}));idx=0;done.clear();load();});
+function pos(e){const r=cv.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))};}
+cv.addEventListener('pointerdown',e=>{if(!img||done.has(idx))return;e.preventDefault();points.push(pos(e));draw();status();});
+$('undo').onclick=()=>{points.pop();draw();status()};
+$('close').onclick=()=>{if(points.length<3)return;polys.push(points.map(p=>({x:p.x,y:p.y})));points=[];current().polys=polys;draw();status()};
+function markDone(){if(!items.length)return;current().polys=polys;done.add(idx);points=[];status();draw();}
+$('empty').onclick=()=>{if(!items.length)return;polys=[];current().polys=[];markDone();};
+$('prev').onclick=()=>{current().polys=polys;idx--;load()};
+$('next').onclick=()=>{current().polys=polys;idx++;load()};
+$('export').onclick=async()=>{
+ if(done.size!==items.length){alert('Revisa y confirma todos los fotogramas antes de exportar.');return;}
+ if(typeof JSZip==='undefined'){alert('No se pudo cargar el módulo ZIP. Conéctate a internet y vuelve a abrir el editor.');return;}
+ const zip=new JSZip(),labels=zip.folder('labels'),backup=[];
+ items.forEach(it=>{const base=it.name.replace(/\.[^.]+$/,'');const lines=(it.polys||[]).map(poly=>'0 '+poly.map(p=>p.x.toFixed(6)+' '+p.y.toFixed(6)).join(' '));labels.file(base+'.txt',lines.join('\n'));backup.push({image:it.name,polygons:it.polys||[]});});
+ zip.file('respaldo_anotaciones.json',JSON.stringify(backup,null,2));
+ zip.file('LEEME.txt','Etiquetas YOLO Segmentation clase 0 = costal. Sólo costales sobre la banda. Los TXT vacíos indican que no había costales sobre la banda. Revisar visualmente antes de entrenar.');
+ const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='conSede_etiquetas.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+};
+window.addEventListener('resize',fit);
+</script>
+</body></html>
