@@ -46,7 +46,8 @@ $('files').addEventListener('change',e=>{items=Array.from(e.target.files).filter
 function pos(e){const r=cv.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))};}
 cv.addEventListener('pointerdown',e=>{if(!img||done.has(idx))return;e.preventDefault();points.push(pos(e));draw();status();});
 $('undo').onclick=()=>{points.pop();draw();status()};
-$('close').onclick=()=>{if(points.length<3)return;polys.push(points.map(p=>({x:p.x,y:p.y})));points=[];current().polys=polys;draw();status()};\n$('confirm').onclick=()=>{current().polys=polys;markDone()};
+$('close').onclick=()=>{if(points.length<3)return;polys.push(points.map(p=>({x:p.x,y:p.y})));points=[];current().polys=polys;draw();status()};
+$('confirm').onclick=()=>{current().polys=polys;markDone()};
 function markDone(){if(!items.length)return;current().polys=polys;done.add(idx);points=[];status();draw();}
 $('empty').onclick=()=>{if(!items.length)return;polys=[];current().polys=[];markDone();};
 $('prev').onclick=()=>{current().polys=polys;idx--;load()};
