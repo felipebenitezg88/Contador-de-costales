@@ -45,8 +45,17 @@ def import_dataset(manifest: Path, source_images: Path, source_labels: Path, out
         rows = list(csv.DictReader(stream))
     required = {"image", "source_video", "proposed_split", "estado", "requiere_revision"}
     if not rows or not required.issubset(rows[0]):
-        raise ValueError("El manifest debe incluir image, source_video y proposed_split.")
-    pending = [row["image"] for row in rows if row["estado"].strip().lower() != "revisado" or row["requiere_revision"].strip().upper() == "SI"]\n    if pending:\n        print("Fotogramas pendientes o marcados para revisión: " + ", ".join(pending[:20]))\n        print("Confirma cada fotograma en el etiquetador y vuelve a exportar.")\n        return 2\n    names = [row["image"] for row in rows]
+        raise ValueError("El manifest debe incluir image, source_video, proposed_split, estado y requiere_revision.")
+    pending = [
+        row["image"] for row in rows
+        if row["estado"].strip().lower() != "revisado"
+        or row["requiere_revision"].strip().upper() == "SI"
+    ]
+    if pending:
+        print("Fotogramas pendientes o marcados para revisión: " + ", ".join(pending[:20]))
+        print("Confirma cada fotograma en el etiquetador y vuelve a exportar.")
+        return 2
+    names = [row["image"] for row in rows]
     if len(names) != len(set(names)):
         raise ValueError("El manifest contiene nombres de imagen duplicados.")
     image_map = index_files(source_images, IMAGE_EXTS)
