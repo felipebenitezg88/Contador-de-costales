@@ -1,9 +1,5 @@
 name: Descargar paquete de fotogramas CONSEDE
-on:
-  workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/package-annotation-frames.yml"
+on: [workflow_dispatch, push]
 permissions:
   contents: read
 jobs:
@@ -11,30 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verificar y empaquetar los 114 fotogramas
+      - name: Preparar paquete
         run: |
-          test -d ml/dataset/costales/frames/review
-          count=$(find ml/dataset/costales/frames/review -maxdepth 1 -type f -iname '*.jpg' | wc -l)
-          echo "Fotogramas encontrados: $count"
-          test "$count" -eq 114
-          mkdir -p paquete-conSede/fotogramas
-          cp ml/dataset/costales/frames/review/*.jpg paquete-conSede/fotogramas/
-          cp ml/ANNOTATION_MANIFEST.csv paquete-conSede/
-          cp ml/ANNOTATION_RULES_CONFIRMED.md paquete-conSede/
-          cp ml/annotation-editor.html paquete-conSede/
-          cat > paquete-conSede/LEEME.txt <<'EOF'
-PAQUETE DE ETIQUETADO CONSEDE
-1. Extrae este ZIP en tu teléfono.
-2. Abre annotation-editor.html en Chrome.
-3. Pulsa Cargar fotogramas y selecciona los JPG de la carpeta fotogramas.
-4. Dibuja el contorno visible SOLO de los costales que estén sobre la banda.
-5. Si no hay costales sobre la banda, pulsa Sin costales en banda.
-6. Confirma cada fotograma y al terminar pulsa Exportar etiquetas ZIP.
-No cuentes las pilas del fondo ni costales fuera de la banda.
-EOF
+          mkdir -p paquete/fotogramas
+          cp ml/dataset/costales/frames/review/*.jpg paquete/fotogramas/
+          cp ml/ANNOTATION_MANIFEST.csv paquete/
+          cp ml/ANNOTATION_RULES_CONFIRMED.md paquete/
+          cp ml/annotation-editor.html paquete/
+          printf '%s\n' 'Extrae el ZIP. Abre annotation-editor.html en Chrome. Carga los JPG. Marca solo costales sobre la banda. Exporta las etiquetas al terminar.' > paquete/LEEME.txt
+          test "$(find paquete/fotogramas -type f -name '*.jpg' | wc -l)" -eq 114
       - uses: actions/upload-artifact@v4
         with:
           name: CONSEDE-114-fotogramas-editor
-          path: paquete-conSede/
-          if-no-files-found: error
+          path: paquete/
           retention-days: 30
