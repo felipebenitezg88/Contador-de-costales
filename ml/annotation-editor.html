@@ -15,14 +15,14 @@
 <label class="pick" for="files">1. Cargar fotogramas</label><input id="files" type="file" accept="image/*" multiple>
 <button id="prev" disabled>◀ Anterior</button><button id="next" disabled>Siguiente ▶</button>
 <button id="undo" disabled>Deshacer punto</button><button id="close" class="primary" disabled>Cerrar polígono</button>
-<button id="empty" class="warn">Sin costales en banda</button>
+<button id="confirm" class="primary" disabled>Confirmar fotograma</button><button id="empty" class="warn">Sin costales en banda</button>
 <button id="export" disabled>Exportar etiquetas ZIP</button>
 </div>
 </header>
 <div id="status">Carga las imágenes JPG extraídas de los videos para comenzar.</div>
 <div id="stage"><canvas id="cv" width="900" height="600"></canvas></div>
 <div id="help">
-<b>Cómo marcar:</b> toca la orilla del costal para agregar puntos; rodea todo el contorno visible y pulsa <b>Cerrar polígono</b>. Repite por cada costal que esté sobre la banda. Para terminar el fotograma sin objetos, pulsa <b>Sin costales en banda</b>. Los cambios se guardan temporalmente en este navegador mientras no borres sus datos.<br>
+<b>Cómo marcar:</b> toca la orilla del costal para agregar puntos; rodea todo el contorno visible y pulsa <b>Cerrar polígono</b>. Repite por cada costal que esté sobre la banda. Para terminar el fotograma sin objetos, pulsa <b>Sin costales en banda</b>. Mantén esta pestaña abierta mientras realizas las anotaciones.<br>
 <span class="small">Consejo: usa tantos puntos como necesite la forma; no incluyas rodillos, banda ni costales apilados fuera de ella.</span>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -31,7 +31,7 @@ const $=id=>document.getElementById(id), cv=$('cv'),ctx=cv.getContext('2d');
 let items=[],idx=0,points=[],polys=[],done=new Set(),img=null,scale=1,offset={x:0,y:0};
 function name(i){return items[i]?.name||''}
 function current(){return items[idx]}
-function status(){ $('status').textContent=items.length?('Fotograma '+(idx+1)+' de '+items.length+' · '+name(idx)+' · Polígonos: '+polys.length+(done.has(idx)?' · revisado':'')):'Carga las imágenes JPG extraídas de los videos para comenzar.'; $('prev').disabled=!items.length||idx===0;$('next').disabled=!items.length||idx===items.length-1;$('undo').disabled=!points.length;$('close').disabled=points.length<3;$('export').disabled=!items.length||done.size!==items.length;}
+function status(){ $('status').textContent=items.length?('Fotograma '+(idx+1)+' de '+items.length+' · '+name(idx)+' · Polígonos: '+polys.length+(done.has(idx)?' · revisado':'')):'Carga las imágenes JPG extraídas de los videos para comenzar.'; $('prev').disabled=!items.length||idx===0;$('next').disabled=!items.length||idx===items.length-1;$('undo').disabled=!points.length;$('close').disabled=points.length<3;$('export').disabled=!items.length||done.size!==items.length;$('confirm').disabled=!items.length||done.has(idx);}
 function fit(){
  if(!img)return;const maxW=Math.min(window.innerWidth-18,1100),maxH=Math.max(260,window.innerHeight*.60);
  const s=Math.min(maxW/img.width,maxH/img.height);cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);scale=s;draw();
@@ -46,7 +46,7 @@ $('files').addEventListener('change',e=>{items=Array.from(e.target.files).filter
 function pos(e){const r=cv.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))};}
 cv.addEventListener('pointerdown',e=>{if(!img||done.has(idx))return;e.preventDefault();points.push(pos(e));draw();status();});
 $('undo').onclick=()=>{points.pop();draw();status()};
-$('close').onclick=()=>{if(points.length<3)return;polys.push(points.map(p=>({x:p.x,y:p.y})));points=[];current().polys=polys;draw();status()};
+$('close').onclick=()=>{if(points.length<3)return;polys.push(points.map(p=>({x:p.x,y:p.y})));points=[];current().polys=polys;draw();status()};\n$('confirm').onclick=()=>{current().polys=polys;markDone()};
 function markDone(){if(!items.length)return;current().polys=polys;done.add(idx);points=[];status();draw();}
 $('empty').onclick=()=>{if(!items.length)return;polys=[];current().polys=[];markDone();};
 $('prev').onclick=()=>{current().polys=polys;idx--;load()};
