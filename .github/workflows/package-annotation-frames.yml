@@ -1,0 +1,37 @@
+name: Descargar paquete de fotogramas CONSEDE
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar y empaquetar los 114 fotogramas
+        run: |
+          test -d ml/dataset/costales/frames/review
+          count=$(find ml/dataset/costales/frames/review -maxdepth 1 -type f -iname '*.jpg' | wc -l)
+          echo "Fotogramas encontrados: $count"
+          test "$count" -eq 114
+          mkdir -p paquete-conSede/fotogramas
+          cp ml/dataset/costales/frames/review/*.jpg paquete-conSede/fotogramas/
+          cp ml/ANNOTATION_MANIFEST.csv paquete-conSede/
+          cp ml/ANNOTATION_RULES_CONFIRMED.md paquete-conSede/
+          cp ml/annotation-editor.html paquete-conSede/
+          cat > paquete-conSede/LEEME.txt <<'EOF'
+PAQUETE DE ETIQUETADO CONSEDE
+1. Extrae este ZIP en tu teléfono.
+2. Abre annotation-editor.html en Chrome.
+3. Pulsa Cargar fotogramas y selecciona los JPG de la carpeta fotogramas.
+4. Dibuja el contorno visible SOLO de los costales que estén sobre la banda.
+5. Si no hay costales sobre la banda, pulsa Sin costales en banda.
+6. Confirma cada fotograma y al terminar pulsa Exportar etiquetas ZIP.
+No cuentes las pilas del fondo ni costales fuera de la banda.
+EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CONSEDE-114-fotogramas-editor
+          path: paquete-conSede/
+          if-no-files-found: error
+          retention-days: 30
