@@ -31,7 +31,7 @@ ml/dataset/costales/
   labels/val/
 ```
 
-Cada imagen debe tener un archivo de etiqueta YOLO-seg con el mismo nombre base. El etiquetador de contornos v3 incluye `ANNOTATION_MANIFEST.csv`, reserva WA0161 y WA0167 para validación y exige confirmar cada fotograma antes de importar. La clase única usa el índice `0`.
+Cada imagen debe tener un archivo de etiqueta YOLO-seg con el mismo nombre base. El etiquetador de contornos v4 incluye `ANNOTATION_MANIFEST.csv`, reserva WA0161 y WA0167 para validación y exige confirmar cada fotograma antes de importar. La clase única usa el índice `0`.
 
 ## Reglas de etiquetado
 
