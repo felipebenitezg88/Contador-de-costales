@@ -31,11 +31,11 @@ ml/dataset/costales/
   labels/val/
 ```
 
-Cada imagen debe tener un archivo de etiqueta YOLO con el mismo nombre base. La clase única usa el índice `0`.
+Cada imagen debe tener un archivo de etiqueta YOLO-seg con el mismo nombre base. El etiquetador de contornos v3 incluye `ANNOTATION_MANIFEST.csv`, reserva WA0161 y WA0167 para validación y exige confirmar cada fotograma antes de importar. La clase única usa el índice `0`.
 
 ## Reglas de etiquetado
 
-1. Dibujar una caja independiente por cada costal visible y distinguible, también cuando esté apilado o fuera de la futura zona de conteo.
+1. Dibujar un polígono de segmentación independiente siguiendo el contorno visible de cada costal distinguible, también cuando esté apilado o fuera de la futura zona de conteo.
 2. Incluir costales blancos lisos, impresos con cualquier color, con franjas o sin ellas.
 3. Incluir distintas orientaciones, deformaciones, distancias e iluminación.
 4. Si un costal está parcialmente tapado, etiquetar la parte visible; no inventar el contorno oculto.
@@ -56,7 +56,7 @@ python ml/validate_dataset.py
 python ml/train.py
 ```
 
-El validador exige al menos 20 imágenes y 50 cajas en train, 5 imágenes y 10 cajas en val, archivos de etiqueta válidos y separación por video. El workflow **Entrenar detector de costales CONSEDE** también ejecuta estos controles, entrena YOLO11n, calcula precisión/recall/mAP y exporta TFLite. El modelo y los reportes se guardan como artefacto de Actions.
+El validador exige al menos 20 imágenes y 50 polígonos en train, 5 imágenes y 10 polígonos en val, archivos de etiqueta válidos y separación por video. El workflow **Entrenar detector de costales CONSEDE** también ejecuta estos controles, entrena YOLO11n, calcula precisión/recall/mAP y exporta TFLite. El modelo y los reportes se guardan como artefacto de Actions.
 
 ## Criterio para aprobar el modelo
 
