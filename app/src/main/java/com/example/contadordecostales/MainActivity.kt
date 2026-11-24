@@ -902,7 +902,7 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 runOnUiThread {
-                                    overlay.setFrame(imageWidth, imageHeight, boxes)
+                                    overlay.showDetections(imageWidth, imageHeight, boxes)
                                     if (newCount >= 0) {
                                         countText.text = newCount.toString()
                                         if (soundEnabled) {
