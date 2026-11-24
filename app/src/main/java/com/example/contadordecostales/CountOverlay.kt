@@ -69,7 +69,7 @@ class CountOverlay(context: Context) : View(context) {
     }
 
     /** Llamar desde el hilo principal. */
-    fun setFrame(width: Int, height: Int, boxes: List<RectF>) {
+    fun showDetections(width: Int, height: Int, boxes: List<RectF>) {
         imageWidth = width
         imageHeight = height
         this.boxes = boxes
