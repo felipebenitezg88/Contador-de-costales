@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var previewView: PreviewView
-    private lateinit var overlay: CountOverlay
+    private lateinit var countOverlay: CountOverlay
     private lateinit var countText: TextView
     private lateinit var statusText: TextView
     private lateinit var metricsText: TextView
@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateOverlayConfig() {
-        overlay.setConfig(
+        countOverlay.setConfig(
             linePosition / 100f,
             zoneTop / 100f,
             zoneBottom / 100f,
@@ -310,7 +310,7 @@ class MainActivity : AppCompatActivity() {
             scaleType = PreviewView.ScaleType.FIT_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
-        overlay = CountOverlay(this)
+        countOverlay = CountOverlay(this)
 
         val cameraFrame = FrameLayout(this).apply {
             addView(
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                 )
             )
             addView(
-                overlay,
+                countOverlay,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -902,7 +902,7 @@ class MainActivity : AppCompatActivity() {
                                 }
 
                                 runOnUiThread {
-                                    overlay.showDetections(imageWidth, imageHeight, boxes)
+                                    countOverlay.showDetections(imageWidth, imageHeight, boxes)
                                     if (newCount >= 0) {
                                         countText.text = newCount.toString()
                                         if (soundEnabled) {
