@@ -503,7 +503,8 @@ class MainActivity : AppCompatActivity() {
             "tonelaje" to "Tonelaje",
             "fechaCertificado" to "F. de certificado"
         )
-        addField("fechaFormato", "Fecha")
+        val fechaActual = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        addAutomaticField("fechaFormato", "Fecha", fechaActual)
         val startTime = if (countStartTimeMillis > 0L) countStartTimeMillis else System.currentTimeMillis()
         val endTime = System.currentTimeMillis()
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -526,6 +527,16 @@ class MainActivity : AppCompatActivity() {
         }
         generalFields.forEach { addField(it.first, it.second) }
 
+        // Estos datos operativos deben capturarse antes del registro de folios.
+        listOf(
+            "comprobanteTraslado" to "Comprobante de traslado",
+            "numeroOrden" to "Número de orden",
+            "bodega" to "Bodega",
+            "banco" to "Banco",
+            "confirmacionEstiba" to "Confirmación de estiba",
+            "cuadrilla" to "Cuadrilla"
+        ).forEach { addField(it.first, it.second) }
+
         content.addView(TextView(this).apply {
             text = "REGISTRO DE FOLIOS"; textSize = 16f
             setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
@@ -537,14 +548,6 @@ class MainActivity : AppCompatActivity() {
             folioFields.add(input)
             content.addView(input)
         }
-        listOf(
-            "comprobanteTraslado" to "Comprobante de traslado",
-            "numeroOrden" to "Número de orden",
-            "bodega" to "Bodega",
-            "banco" to "Banco"
-        ).forEach { addField(it.first, it.second) }
-        addField("cuadrilla", "Cuadrilla")
-        addField("confirmacionEstiba", "Confirmación de estiba")
         addField("rotosOrigen", "Sacos rotos de origen", true)
         addField("rotosManiobra", "Sacos rotos por maniobra", true)
         addField("comentarios", "Comentarios")
@@ -579,14 +582,18 @@ class MainActivity : AppCompatActivity() {
                 previewItems.add(PreviewItem("Tipo de caja", values["tipoCaja"].orEmpty(), "tipoCaja"))
                 previewItems.add(PreviewItem("Tipo de unidad", values["tipoUnidad"].orEmpty(), "tipoUnidad"))
                 generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
+                val beforeFolios = listOf(
+                    "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
+                    "bodega" to "Bodega", "banco" to "Banco", "confirmacionEstiba" to "Confirmación de estiba",
+                    "cuadrilla" to "Cuadrilla"
+                )
+                beforeFolios.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
                 folioFields.forEachIndexed { index, input ->
                     val rowValue = input.text.toString().trim()
-                    previewItems.add(PreviewItem("Folio — renglón ${index + 1}", rowValue, "folio:$index"))
+                    previewItems.add(PreviewItem("Folio ${index + 1}", rowValue, "folio:$index"))
                 }
                 val additionalFields = listOf(
-                    "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
-                    "bodega" to "Bodega", "banco" to "Banco", "cuadrilla" to "Cuadrilla",
-                    "confirmacionEstiba" to "Confirmación de estiba", "rotosOrigen" to "Sacos rotos de origen",
+                    "rotosOrigen" to "Sacos rotos de origen",
                     "rotosManiobra" to "Sacos rotos por maniobra", "comentarios" to "Comentarios",
                     "supervisor" to "Supervisor"
                 )
