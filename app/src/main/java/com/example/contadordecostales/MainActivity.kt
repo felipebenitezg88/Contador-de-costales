@@ -533,7 +533,7 @@ class MainActivity : AppCompatActivity() {
             "numeroOrden" to "Número de orden",
             "bodega" to "Bodega",
             "banco" to "Banco",
-            "confirmacionEstiba" to "Confirmación de estiba",
+            "confirmacionEstiba" to "Conformación de estiba",
             "cuadrilla" to "Cuadrilla"
         ).forEach { addField(it.first, it.second) }
 
@@ -584,7 +584,7 @@ class MainActivity : AppCompatActivity() {
                 generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
                 val beforeFolios = listOf(
                     "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
-                    "bodega" to "Bodega", "banco" to "Banco", "confirmacionEstiba" to "Confirmación de estiba",
+                    "bodega" to "Bodega", "banco" to "Banco", "confirmacionEstiba" to "Conformación de estiba",
                     "cuadrilla" to "Cuadrilla"
                 )
                 beforeFolios.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
