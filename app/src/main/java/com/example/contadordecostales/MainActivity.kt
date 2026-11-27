@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
 
     private var totalCount = 0
     private var operationType: String = ""
+    private var countStartTimeMillis: Long = 0L
 
     @Volatile
     private var isCounting = false
@@ -435,6 +436,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Selecciona el tipo de operación")
             .setItems(choices) { dialog, which ->
                 operationType = choices[which]
+                countStartTimeMillis = System.currentTimeMillis()
                 isCounting = true
                 statusText.text = "Operación: $operationType. Conteo activo."
                 synchronized(stateLock) { tracks.clear() }
@@ -455,6 +457,23 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(18), dp(10), dp(18), dp(10))
         }
         val fields = linkedMapOf<String, android.widget.EditText>()
+        val selections = linkedMapOf<String, String>()
+        fun addChoiceField(key: String, label: String, options: Array<String>) {
+            content.addView(TextView(this).apply { text = label; textSize = 13f; setTextColor(Color.DKGRAY) })
+            val spinner = android.widget.Spinner(this)
+            spinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, options)
+            content.addView(spinner)
+            selections[key] = options.first()
+            spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) { selections[key] = options[position] }
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+            }
+        }
+        fun addAutomaticField(key: String, label: String, value: String) {
+            content.addView(TextView(this).apply { text = label; textSize = 13f; setTextColor(Color.DKGRAY) })
+            content.addView(TextView(this).apply { text = value; textSize = 16f; setTextColor(Color.DKGRAY); setPadding(dp(10), dp(10), dp(10), dp(10)) })
+            fields[key] = android.widget.EditText(this).apply { setText(value) }
+        }
         fun addField(key: String, label: String, numeric: Boolean = false) {
             content.addView(TextView(this).apply {
                 text = label; textSize = 13f; setTextColor(Color.DKGRAY)
@@ -466,13 +485,7 @@ class MainActivity : AppCompatActivity() {
             fields[key] = input
             content.addView(input)
         }
-        content.addView(TextView(this).apply {
-            text = "DATOS GENERALES"; textSize = 16f
-            setTextColor(Color.BLACK); setPadding(0, dp(4), 0, dp(8))
-        })
         val generalFields = listOf(
-            "cajaNumero" to "Caja número",
-            "tipoCaja" to "Tipo de caja (Full / Sencillo)",
             "fechaFormato" to "Fecha",
             "transportista" to "Transportista",
             "cliente" to "Cliente",
@@ -483,61 +496,43 @@ class MainActivity : AppCompatActivity() {
             "placasTracto" to "Placas tracto",
             "placasCaja" to "Placas caja",
             "numeroLiberacion" to "No. de liberación",
-            "numeroEconomico" to "No. económico",
             "marca" to "Marca",
             "zafra" to "Zafra",
             "calidad" to "Calidad",
-            "destino" to "Destino",
-            "contrato" to "Contrato",
             "bultos" to "Bultos",
             "presentacion" to "Presentación",
             "tonelaje" to "Tonelaje",
             "fechaCertificado" to "F. de certificado"
         )
+        addChoiceField("caja", "Caja", arrayOf("1", "2"))
+        addChoiceField("tipoCaja", "Tipo de caja", arrayOf("Full", "Sencillo", "Torton"))
+        generalFields.forEach { addField(it.first, it.second) }
         generalFields.forEach { addField(it.first, it.second) }
 
         content.addView(TextView(this).apply {
             text = "REGISTRO DE FOLIOS (10 RENGLONES)"; textSize = 16f
             setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
         })
-        val folioFields = mutableListOf<List<android.widget.EditText>>()
+        val folioFields = mutableListOf<android.widget.EditText>()
         repeat(10) { index ->
-            content.addView(TextView(this).apply {
-                text = "Renglón ${index + 1}"; textSize = 12f; setTextColor(Color.DKGRAY)
-            })
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            val rowInputs = mutableListOf<android.widget.EditText>()
-            repeat(3) { col ->
-                val input = android.widget.EditText(this).apply {
-                    hint = "Folio ${col + 1}"; textSize = 13f; setSingleLine(true)
-                    layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-                        setMargins(dp(2), 0, dp(2), dp(3))
-                    }
-                }
-                rowInputs.add(input); row.addView(input)
-            }
-            folioFields.add(rowInputs); content.addView(row)
+            content.addView(TextView(this).apply { text = "Renglón ${index + 1}"; textSize = 12f; setTextColor(Color.DKGRAY) })
+            val input = android.widget.EditText(this).apply { hint = "Folio"; textSize = 13f; setSingleLine(true) }
+            folioFields.add(input)
+            content.addView(input)
         }
-
-        content.addView(TextView(this).apply {
-            text = "DATOS ADICIONALES"; textSize = 16f
-            setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
-        })
+        val startTime = if (countStartTimeMillis > 0L) countStartTimeMillis else System.currentTimeMillis()
+        val endTime = System.currentTimeMillis()
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        addAutomaticField("horaEntrada", "Hora de entrada", timeFormat.format(Date(startTime)))
+        addAutomaticField("horaSalida", "Hora de salida", timeFormat.format(Date(endTime)))
         listOf(
-            "horaEntrada" to "Hora de entrada",
-            "horaSalida" to "Hora de salida",
             "comprobanteTraslado" to "Comprobante de traslado",
             "numeroOrden" to "Número de orden",
             "bodega" to "Bodega",
             "banco" to "Banco"
         ).forEach { addField(it.first, it.second) }
-
-        content.addView(TextView(this).apply {
-            text = "DATOS QUE YA EXISTÍAN EN EL CONTADOR"; textSize = 16f
-            setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
-        })
         addField("cuadrilla", "Cuadrilla")
-        addField("estiba", "Estiba")
+        addField("confirmacionEstiba", "Confirmación de estiba")
         addField("rotosOrigen", "Sacos rotos de origen", true)
         addField("rotosManiobra", "Sacos rotos por maniobra", true)
         addField("comentarios", "Comentarios")
@@ -561,18 +556,19 @@ class MainActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
                 val values = fields.mapValues { it.value.text.toString().trim() }.toMutableMap()
+                values.putAll(selections)
                 data class PreviewItem(val label: String, var value: String, val key: String)
                 val previewItems = mutableListOf<PreviewItem>()
                 generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
-                folioFields.forEachIndexed { index, row ->
-                    val rowValue = row.joinToString(" | ") { it.text.toString().trim() }
-                    previewItems.add(PreviewItem("Folio — renglón \${index + 1}", rowValue, "folio:$index"))
+                folioFields.forEachIndexed { index, input ->
+                    val rowValue = input.text.toString().trim()
+                    previewItems.add(PreviewItem("Folio — renglón ${index + 1}", rowValue, "folio:$index"))
                 }
                 val additionalFields = listOf(
                     "horaEntrada" to "Hora de entrada", "horaSalida" to "Hora de salida",
                     "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
                     "bodega" to "Bodega", "banco" to "Banco", "cuadrilla" to "Cuadrilla",
-                    "estiba" to "Estiba", "rotosOrigen" to "Sacos rotos de origen",
+                    "confirmacionEstiba" to "Confirmación de estiba", "rotosOrigen" to "Sacos rotos de origen",
                     "rotosManiobra" to "Sacos rotos por maniobra", "comentarios" to "Comentarios",
                     "supervisor" to "Supervisor"
                 )
@@ -662,13 +658,12 @@ class MainActivity : AppCompatActivity() {
                             return@setOnClickListener
                         }
                         val foliosFinales = JSONArray()
-                        previewItems.filter { it.key.startsWith("folio:") }.forEach { item ->
-                            val parts = item.value.split("|").map { it.trim() }
-                            foliosFinales.put(JSONArray().apply { repeat(3) { col -> put(parts.getOrElse(col) { "" }) } })
-                        }
+                        previewItems.filter { it.key.startsWith("folio:") }.forEach { item -> foliosFinales.put(item.value) }
                         val totalNetoFinal = originalCount - origenFinal - maniobraFinal
                         val registro = JSONObject().apply {
                             put("fecha", fechaRegistro); put("operacion", operationType)
+                            put("horaInicioConteo", values["horaEntrada"].orEmpty())
+                            put("horaFinConteo", values["horaSalida"].orEmpty())
                             put("conteoOriginal", originalCount); put("totalNeto", totalNetoFinal); put("meta", productionGoal)
                             values.filterKeys { !it.startsWith("folio:") }.forEach { (key, value) -> put(key, value) }
                             put("rotosOrigen", origenFinal); put("rotosManiobra", maniobraFinal)
