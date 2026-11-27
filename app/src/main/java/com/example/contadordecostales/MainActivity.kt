@@ -507,7 +507,6 @@ class MainActivity : AppCompatActivity() {
         addChoiceField("caja", "Caja", arrayOf("1", "2"))
         addChoiceField("tipoCaja", "Tipo de caja", arrayOf("Full", "Sencillo", "Torton"))
         generalFields.forEach { addField(it.first, it.second) }
-        generalFields.forEach { addField(it.first, it.second) }
 
         content.addView(TextView(this).apply {
             text = "REGISTRO DE FOLIOS (10 RENGLONES)"; textSize = 16f
@@ -559,6 +558,8 @@ class MainActivity : AppCompatActivity() {
                 values.putAll(selections)
                 data class PreviewItem(val label: String, var value: String, val key: String)
                 val previewItems = mutableListOf<PreviewItem>()
+                previewItems.add(PreviewItem("Caja", values["caja"].orEmpty(), "caja"))
+                previewItems.add(PreviewItem("Tipo de caja", values["tipoCaja"].orEmpty(), "tipoCaja"))
                 generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
                 folioFields.forEachIndexed { index, input ->
                     val rowValue = input.text.toString().trim()
