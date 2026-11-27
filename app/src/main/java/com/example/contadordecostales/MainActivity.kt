@@ -568,8 +568,12 @@ class MainActivity : AppCompatActivity() {
                     folios.put(rowJson)
                 }
                 val totalNeto = originalCount - origen - maniobra
+                val fechaRegistro = SimpleDateFormat(
+                    "dd/MM/yyyy HH:mm:ss", Locale.getDefault()
+                ).format(Date())
                 val previewLines = mutableListOf<String>()
                 previewLines.add("CONSEDE — CONTROL OPERATIVO")
+                previewLines.add("Fecha de registro: $fechaRegistro")
                 previewLines.add("Operación: $operationType")
                 previewLines.add("Conteo original: $originalCount")
                 previewLines.add("Total neto: $totalNeto")
@@ -612,9 +616,6 @@ class MainActivity : AppCompatActivity() {
                     .setNegativeButton("Volver a editar", null)
                     .setPositiveButton("Confirmar y guardar") { _, _ ->
                         formDialog.dismiss()
-                        val fechaRegistro = SimpleDateFormat(
-                            "dd/MM/yyyy HH:mm:ss", Locale.getDefault()
-                        ).format(Date())
                         val registro = JSONObject().apply {
                             put("fecha", fechaRegistro)
                             put("operacion", operationType)
