@@ -509,7 +509,7 @@ class MainActivity : AppCompatActivity() {
             val rowInputs = mutableListOf<android.widget.EditText>()
             repeat(3) { col ->
                 val input = android.widget.EditText(this).apply {
-                    hint = "Folio ${col + 1}"; textSize = 13f; singleLine = true
+                    hint = "Folio ${col + 1}"; textSize = 13f; setSingleLine(true)
                     layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply {
                         setMargins(dp(2), 0, dp(2), dp(3))
                     }
