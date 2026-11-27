@@ -473,7 +473,7 @@ class MainActivity : AppCompatActivity() {
         val generalFields = listOf(
             "cajaNumero" to "Caja número",
             "tipoCaja" to "Tipo de caja (Full / Sencillo)",
-            "fecha" to "Fecha",
+            "fechaFormato" to "Fecha",
             "transportista" to "Transportista",
             "cliente" to "Cliente",
             "operador" to "Operador",
@@ -606,12 +606,12 @@ class MainActivity : AppCompatActivity() {
                 val previewScroll = android.widget.ScrollView(this).apply {
                     addView(previewView); isFillViewport = true
                 }
-                formDialog.dismiss()
                 AlertDialog.Builder(this)
                     .setTitle("Vista previa antes de guardar")
                     .setView(previewScroll)
-                    .setNegativeButton("Volver a editar") { _, _ -> showSaveCountDialog() }
+                    .setNegativeButton("Volver a editar", null)
                     .setPositiveButton("Confirmar y guardar") { _, _ ->
+                        formDialog.dismiss()
                         val fechaRegistro = SimpleDateFormat(
                             "dd/MM/yyyy HH:mm:ss", Locale.getDefault()
                         ).format(Date())
