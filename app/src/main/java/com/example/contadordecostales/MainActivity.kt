@@ -526,6 +526,10 @@ class MainActivity : AppCompatActivity() {
         }
         generalFields.forEach { addField(it.first, it.second) }
 
+        content.addView(TextView(this).apply {
+            text = "REGISTRO DE FOLIOS"; textSize = 16f
+            setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
+        })
         val folioFields = mutableListOf<android.widget.EditText>()
         repeat(10) { index ->
             content.addView(TextView(this).apply { text = "Folio ${index + 1}"; textSize = 13f; setTextColor(Color.DKGRAY) })
