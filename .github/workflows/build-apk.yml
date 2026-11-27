@@ -2,7 +2,7 @@ name: Compilar APK Android
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, mejoras-carga-descarga ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]

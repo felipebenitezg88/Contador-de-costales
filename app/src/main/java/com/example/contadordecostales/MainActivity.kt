@@ -68,17 +68,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var countText: TextView
     private lateinit var statusText: TextView
     private lateinit var metricsText: TextView
-    private lateinit var speedText: TextView
     private lateinit var cameraExecutor: ExecutorService
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val speedRefreshTask = object : Runnable {
-        override fun run() {
-            if (!isFinishing && !isDestroyed) {
-                refreshLiveIndicators()
-                mainHandler.postDelayed(this, 1000L)
-            }
-        }
-    }
 
     private val preferences by lazy {
         getSharedPreferences("contador_config", MODE_PRIVATE)
@@ -93,10 +84,11 @@ class MainActivity : AppCompatActivity() {
     private var leftToRight = true
 
     private var totalCount = 0
-    private val countTimestamps = mutableListOf<Long>()
+    private var operationType: String = ""
+    private var countStartTimeMillis: Long = 0L
 
     @Volatile
-    private var isCounting = true
+    private var isCounting = false
 
     private val savedCounts = mutableListOf<String>()
     private val historyPreferences by lazy {
@@ -162,7 +154,7 @@ class MainActivity : AppCompatActivity() {
 
         createInterface()
         updateOverlayConfig()
-        mainHandler.post(speedRefreshTask)
+        showOperationDialog()
 
         if (ContextCompat.checkSelfPermission(
                 this, Manifest.permission.CAMERA
@@ -277,18 +269,9 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, dp(2), 0, dp(2))
         }
 
-        speedText = TextView(this).apply {
-            text = "Velocidad: 0 costales/min"
-            textSize = 13f
-            setTextColor(Color.rgb(125, 211, 252))
-            gravity = Gravity.CENTER
-            setPadding(0, dp(2), 0, dp(2))
-        }
-
         counterCard.addView(counterLabel)
         counterCard.addView(countText)
         counterCard.addView(metricsText)
-        counterCard.addView(speedText)
         counterCard.addView(statusText)
 
         val cameraLabel = TextView(this).apply {
@@ -358,12 +341,10 @@ class MainActivity : AppCompatActivity() {
         ) {
             synchronized(stateLock) {
                 totalCount = 0
-                countTimestamps.clear()
                 tracks.clear()
             }
             countText.text = "0"
             metricsText.text = "Meta: $productionGoal | Avance: 0%"
-            speedText.text = "Velocidad: 0 costales/min"
             statusText.text = "Contador reiniciado"
         }
 
@@ -449,120 +430,284 @@ class MainActivity : AppCompatActivity() {
         androidx.core.view.ViewCompat.requestApplyInsets(root)
     }
 
-    private fun showSaveCountDialog() {
-        val originalCount = synchronized(stateLock) {
-            totalCount
-        }
+    private fun showOperationDialog() {
+        val choices = arrayOf("CARGA", "DESCARGA")
+        AlertDialog.Builder(this)
+            .setTitle("Selecciona el tipo de operación")
+            .setItems(choices) { dialog, which ->
+                operationType = choices[which]
+                countStartTimeMillis = System.currentTimeMillis()
+                isCounting = true
+                statusText.text = "Operación: $operationType. Conteo activo."
+                synchronized(stateLock) { tracks.clear() }
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+            .show()
+    }
 
+    private fun showSaveCountDialog() {
+        val originalCount = synchronized(stateLock) { totalCount }
+        if (operationType.isBlank()) {
+            showOperationDialog()
+            return
+        }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(10), dp(20), dp(10))
+            setPadding(dp(18), dp(10), dp(18), dp(10))
         }
-
-        fun addField(
-            label: String,
-            numeric: Boolean = false
-        ): android.widget.EditText {
-            val title = TextView(this).apply {
-                text = label
-                textSize = 14f
-                setTextColor(Color.BLACK)
+        val fields = linkedMapOf<String, android.widget.EditText>()
+        val selections = linkedMapOf<String, String>()
+        fun addChoiceField(key: String, label: String, options: Array<String>) {
+            content.addView(TextView(this).apply { text = label; textSize = 13f; setTextColor(Color.DKGRAY) })
+            val spinner = android.widget.Spinner(this)
+            spinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, options)
+            content.addView(spinner)
+            selections[key] = options.first()
+            spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) { selections[key] = options[position] }
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
             }
-            content.addView(title)
-
-            val field = android.widget.EditText(this).apply {
-                hint = "Escribe aquí"
-                textSize = 16f
-                if (numeric) {
-                    inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        fun addAutomaticField(key: String, label: String, value: String) {
+            content.addView(TextView(this).apply { text = label; textSize = 13f; setTextColor(Color.DKGRAY) })
+            content.addView(TextView(this).apply { text = value; textSize = 16f; setTextColor(Color.DKGRAY); setPadding(dp(10), dp(10), dp(10), dp(10)) })
+            fields[key] = android.widget.EditText(this).apply { setText(value) }
+        }
+        fun addField(key: String, label: String, numeric: Boolean = false) {
+            content.addView(TextView(this).apply {
+                text = label; textSize = 13f; setTextColor(Color.DKGRAY)
+            })
+            val input = android.widget.EditText(this).apply {
+                hint = "Escribe aquí"; textSize = 15f
+                if (numeric) inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+            fields[key] = input
+            content.addView(input)
+        }
+        val generalFields = listOf(
+            "transportista" to "Transportista",
+            "cliente" to "Cliente",
+            "operador" to "Operador",
+            "sellos" to "Sellos",
+            "cartaPorte" to "Carta porte",
+            "remision" to "Remisión",
+            "placasTracto" to "Placas tracto",
+            "placasCaja" to "Placas caja",
+            "numeroLiberacion" to "No. de liberación",
+            "marca" to "Marca",
+            "zafra" to "Zafra",
+            "calidad" to "Calidad",
+            "bultos" to "Bultos",
+            "presentacion" to "Presentación",
+            "tonelaje" to "Tonelaje",
+            "fechaCertificado" to "F. de certificado"
+        )
+        val fechaActual = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        addAutomaticField("fechaFormato", "Fecha", fechaActual)
+        val startTime = if (countStartTimeMillis > 0L) countStartTimeMillis else System.currentTimeMillis()
+        val endTime = System.currentTimeMillis()
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        addAutomaticField("horaEntrada", "Hora de entrada", timeFormat.format(Date(startTime)))
+        addAutomaticField("horaSalida", "Hora de salida", timeFormat.format(Date(endTime)))
+        addChoiceField("caja", "Caja", arrayOf("1", "2"))
+        addField("tipoCaja", "Tipo de caja")
+        content.addView(TextView(this).apply {
+            text = "Tipo de unidad"; textSize = 13f; setTextColor(Color.DKGRAY)
+        })
+        val tiposUnidadSeleccionados = linkedSetOf<String>()
+        arrayOf("Full", "Sencillo", "Torton").forEach { tipo ->
+            val check = android.widget.CheckBox(this).apply {
+                text = tipo
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) tiposUnidadSeleccionados.add(tipo) else tiposUnidadSeleccionados.remove(tipo)
                 }
             }
-            content.addView(field)
-            return field
+            content.addView(check)
         }
+        generalFields.forEach { addField(it.first, it.second) }
 
-        val countLabel = TextView(this).apply {
-            text = "Conteo original: $originalCount"
-            textSize = 18f
-            setTextColor(Color.rgb(22, 163, 74))
+        // Estos datos operativos deben capturarse antes del registro de folios.
+        listOf(
+            "comprobanteTraslado" to "Comprobante de traslado",
+            "numeroOrden" to "Número de orden",
+            "bodega" to "Bodega",
+            "banco" to "Banco",
+            "confirmacionEstiba" to "Conformación de estiba",
+            "cuadrilla" to "Cuadrilla"
+        ).forEach { addField(it.first, it.second) }
+
+        content.addView(TextView(this).apply {
+            text = "REGISTRO DE FOLIOS"; textSize = 16f
+            setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
+        })
+        val folioFields = mutableListOf<android.widget.EditText>()
+        repeat(10) { index ->
+            content.addView(TextView(this).apply { text = "Folio ${index + 1}"; textSize = 13f; setTextColor(Color.DKGRAY) })
+            val input = android.widget.EditText(this).apply { hint = "Escribe aquí"; textSize = 13f; setSingleLine(true) }
+            folioFields.add(input)
+            content.addView(input)
         }
-        content.addView(countLabel)
+        addField("rotosOrigen", "Sacos rotos de origen", true)
+        addField("rotosManiobra", "Sacos rotos por maniobra", true)
+        addField("comentarios", "Comentarios")
+        addField("supervisor", "Supervisor")
 
-        val cuadrilla = addField("Cuadrilla")
-        val estiba = addField("Estiba")
-        val rotosOrigen = addField("Sacos rotos de origen", true)
-        val rotosManiobra = addField("Sacos rotos por maniobra", true)
-        val comentarios = addField("Comentarios")
-        val supervisor = addField("Supervisor")
-
-        val scroll = android.widget.ScrollView(this).apply {
-            addView(content)
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Guardar conteo")
+        val scroll = android.widget.ScrollView(this).apply { addView(content) }
+        val formDialog = AlertDialog.Builder(this)
+            .setTitle("Datos del registro")
             .setView(scroll)
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Confirmar y guardar", null)
+            .setPositiveButton("Vista previa", null)
             .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener {
-                    val origen = rotosOrigen.text.toString()
-                        .toIntOrNull() ?: 0
-                    val maniobra = rotosManiobra.text.toString()
-                        .toIntOrNull() ?: 0
-
-                    if (origen + maniobra > originalCount) {
-                        android.widget.Toast.makeText(
-                            this,
-                            "Los sacos rotos no pueden superar el conteo",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                        return@setOnClickListener
-                    }
-
-                    val totalNeto = originalCount - origen - maniobra
-                    val fecha = SimpleDateFormat(
-                        "dd/MM/yyyy HH:mm:ss",
-                        Locale.getDefault()
-                    ).format(Date())
-
-                    val registro = JSONObject().apply {
-                        put("fecha", fecha)
-                        put("conteoOriginal", originalCount)
-                        put("cuadrilla", cuadrilla.text.toString())
-                        put("estiba", estiba.text.toString())
-                        put("rotosOrigen", origen)
-                        put("rotosManiobra", maniobra)
-                        put("totalNeto", totalNeto)
-                        put("comentarios", comentarios.text.toString())
-                        put("supervisor", supervisor.text.toString())
-                    }
-
-                    savedCounts.add(registro.toString())
-
-                    val historyArray = JSONArray()
-                    savedCounts.forEach {
-                        historyArray.put(it)
-                    }
-
-                    historyPreferences.edit()
-                        .putString("registros", historyArray.toString())
-                        .apply()
-
-                    android.widget.Toast.makeText(
-                        this,
-                        "Conteo guardado. Total neto: $totalNeto",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-
-                    dialog.dismiss()
+        formDialog.setOnShowListener {
+            formDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val origen = fields["rotosOrigen"]?.text.toString().toIntOrNull() ?: 0
+                val maniobra = fields["rotosManiobra"]?.text.toString().toIntOrNull() ?: 0
+                if (origen + maniobra > originalCount) {
+                    android.widget.Toast.makeText(this,
+                        "Los sacos rotos no pueden superar el conteo",
+                        android.widget.Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
                 }
-        }
+                val values = fields.mapValues { it.value.text.toString().trim() }.toMutableMap()
+                values.putAll(selections)
+                values["tipoUnidad"] = tiposUnidadSeleccionados.joinToString(", ")
+                data class PreviewItem(val label: String, var value: String, val key: String)
+                val previewItems = mutableListOf<PreviewItem>()
+                previewItems.add(PreviewItem("Fecha", values["fechaFormato"].orEmpty(), "fechaFormato"))
+                previewItems.add(PreviewItem("Hora de entrada", values["horaEntrada"].orEmpty(), "horaEntrada"))
+                previewItems.add(PreviewItem("Hora de salida", values["horaSalida"].orEmpty(), "horaSalida"))
+                previewItems.add(PreviewItem("Caja", values["caja"].orEmpty(), "caja"))
+                previewItems.add(PreviewItem("Tipo de caja", values["tipoCaja"].orEmpty(), "tipoCaja"))
+                previewItems.add(PreviewItem("Tipo de unidad", values["tipoUnidad"].orEmpty(), "tipoUnidad"))
+                generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
+                val beforeFolios = listOf(
+                    "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
+                    "bodega" to "Bodega", "banco" to "Banco", "confirmacionEstiba" to "Conformación de estiba",
+                    "cuadrilla" to "Cuadrilla"
+                )
+                beforeFolios.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
+                folioFields.forEachIndexed { index, input ->
+                    val rowValue = input.text.toString().trim()
+                    previewItems.add(PreviewItem("Folio ${index + 1}", rowValue, "folio:$index"))
+                }
+                val additionalFields = listOf(
+                    "rotosOrigen" to "Sacos rotos de origen",
+                    "rotosManiobra" to "Sacos rotos por maniobra", "comentarios" to "Comentarios",
+                    "supervisor" to "Supervisor"
+                )
+                additionalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
+                val fechaRegistro = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                val instructionInput = android.widget.EditText(this).apply {
+                    hint = "Escribe indicaciones para este registro"; textSize = 14f; minLines = 2
+                    setPadding(dp(10), dp(8), dp(10), dp(8))
+                }
+                val previewContent = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                }
+                val previewScroll = android.widget.ScrollView(this).apply { addView(previewContent); isFillViewport = true }
+                val previewDialog = AlertDialog.Builder(this)
+                    .setTitle("Vista previa editable")
+                    .setView(previewScroll)
+                    .setNegativeButton("Volver a editar", null)
+                    .setPositiveButton("Confirmar y guardar", null)
+                    .create()
 
-        dialog.show()
+                fun renderPreviewItems() {
+                    previewContent.removeAllViews()
+                    previewContent.addView(TextView(this).apply {
+                        text = "CONSEDE — CONTROL OPERATIVO\nFecha: $fechaRegistro\nOperación: $operationType\nConteo original: $originalCount\nTotal neto estimado: " +
+                            (originalCount - (values["rotosOrigen"]?.toIntOrNull() ?: 0) - (values["rotosManiobra"]?.toIntOrNull() ?: 0)) +
+                            "\nMeta: $productionGoal"
+                        textSize = 14f; setTextColor(Color.BLACK); setPadding(dp(6), dp(6), dp(6), dp(12))
+                    })
+                    previewItems.forEachIndexed { index, item ->
+                        val card = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            background = roundedBackground(Color.rgb(238, 242, 246))
+                            setPadding(dp(10), dp(8), dp(10), dp(8))
+                            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                                .apply { setMargins(0, dp(3), 0, dp(3)) }
+                        }
+                        card.addView(TextView(this).apply { text = item.label; textSize = 13f; setTextColor(Color.rgb(45, 55, 65)) })
+                        card.addView(TextView(this).apply {
+                            text = item.value.ifBlank { "—" }; textSize = 15f; setTextColor(Color.BLACK)
+                            setPadding(0, dp(3), 0, dp(5))
+                        })
+                        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                        fun actionButton(label: String, enabled: Boolean = true, action: () -> Unit) {
+                            actions.addView(Button(this@MainActivity).apply {
+                                text = label; textSize = 10f; isAllCaps = false; isEnabled = enabled
+                                setOnClickListener { action() }
+                                layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply { setMargins(dp(2), 0, dp(2), 0) }
+                            })
+                        }
+                        actionButton("Editar") {
+                            val editor = android.widget.EditText(this).apply { setText(item.value); setSelection(text.length); minLines = 1 }
+                            AlertDialog.Builder(this).setTitle("Editar " + item.label).setView(editor)
+                                .setNegativeButton("Cancelar", null)
+                                .setPositiveButton("Aplicar") { _, _ ->
+                                    item.value = editor.text.toString().trim()
+                                    values[item.key] = item.value
+                                    renderPreviewItems()
+                                }.show()
+                        }
+                        actionButton("Eliminar") {
+                            AlertDialog.Builder(this).setMessage("¿Eliminar «" + item.label + "» de este registro?")
+                                .setNegativeButton("Cancelar", null)
+                                .setPositiveButton("Eliminar") { _, _ -> previewItems.removeAt(index); values.remove(item.key); renderPreviewItems() }
+                                .show()
+                        }
+                        actionButton("↑", index > 0) { val moved = previewItems.removeAt(index); previewItems.add(index - 1, moved); renderPreviewItems() }
+                        actionButton("↓", index < previewItems.lastIndex) { val moved = previewItems.removeAt(index); previewItems.add(index + 1, moved); renderPreviewItems() }
+                        card.addView(actions)
+                        previewContent.addView(card)
+                    }
+                    previewContent.addView(TextView(this).apply {
+                        text = "Indicaciones para este registro"; textSize = 14f; setTextColor(Color.BLACK)
+                        setPadding(0, dp(12), 0, dp(4))
+                    })
+                    (instructionInput.parent as? android.view.ViewGroup)?.removeView(instructionInput)
+                    previewContent.addView(instructionInput)
+                }
+
+                renderPreviewItems()
+                previewDialog.setOnShowListener {
+                    previewDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val origenFinal = values["rotosOrigen"]?.toIntOrNull() ?: 0
+                        val maniobraFinal = values["rotosManiobra"]?.toIntOrNull() ?: 0
+                        if (origenFinal < 0 || maniobraFinal < 0 || origenFinal + maniobraFinal > originalCount) {
+                            android.widget.Toast.makeText(this, "Revisa los sacos rotos: no pueden superar el conteo ni ser negativos", android.widget.Toast.LENGTH_LONG).show()
+                            return@setOnClickListener
+                        }
+                        val foliosFinales = JSONArray()
+                        previewItems.filter { it.key.startsWith("folio:") }.forEach { item -> foliosFinales.put(item.value) }
+                        val totalNetoFinal = originalCount - origenFinal - maniobraFinal
+                        val registro = JSONObject().apply {
+                            put("fecha", fechaRegistro); put("operacion", operationType)
+                            put("horaInicioConteo", values["horaEntrada"].orEmpty())
+                            put("horaFinConteo", values["horaSalida"].orEmpty())
+                            put("conteoOriginal", originalCount); put("totalNeto", totalNetoFinal); put("meta", productionGoal)
+                            values.filterKeys { !it.startsWith("folio:") }.forEach { (key, value) -> put(key, value) }
+                            put("rotosOrigen", origenFinal); put("rotosManiobra", maniobraFinal)
+                            put("folios", foliosFinales)
+                            put("ordenVistaPrevia", JSONArray().apply { previewItems.forEach { put(it.label) } })
+                            put("indicaciones", instructionInput.text.toString().trim())
+                        }
+                        savedCounts.add(registro.toString())
+                        val historyArray = JSONArray()
+                        savedCounts.forEach { historyArray.put(it) }
+                        historyPreferences.edit().putString("registros", historyArray.toString()).apply()
+                        formDialog.dismiss(); previewDialog.dismiss()
+                        android.widget.Toast.makeText(this, "Registro guardado correctamente", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                previewDialog.show()
+            }
+        }
+        formDialog.show()
     }
 
     private fun showHistory() {
@@ -705,7 +850,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(sensitivityBar)
 
         val goalLabel = TextView(this).apply {
-            text = "Meta diaria de producción (costales)"
+            text = "Meta (costales)"
             textSize = 14f
             setTextColor(Color.BLACK)
             setPadding(0, dp(12), 0, 0)
@@ -761,18 +906,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshLiveIndicators() {
-        val snapshot = synchronized(stateLock) {
-            val now = SystemClock.elapsedRealtime()
-            countTimestamps.removeAll { now - it >= 60_000L }
-            totalCount to countTimestamps.size
-        }
-        updateProductionIndicators(snapshot.first, snapshot.second)
+        val count = synchronized(stateLock) { totalCount }
+        updateProductionIndicators(count)
     }
 
-    private fun updateProductionIndicators(count: Int, speedPerMinute: Int) {
+    private fun updateProductionIndicators(count: Int) {
         val percent = ((count.toDouble() / productionGoal.toDouble()) * 100.0).toInt()
         metricsText.text = "Meta: $productionGoal | Avance: $percent%"
-        speedText.text = "Velocidad (últimos 60 s): $speedPerMinute costales/min"
     }
 
     private fun startCamera() {
@@ -823,12 +963,10 @@ class MainActivity : AppCompatActivity() {
                             .addOnSuccessListener(cameraExecutor) { objects ->
                                 var newCount = -1
                                 var currentCount = 0
-                                var newSpeed = 0
                                 val boxes = ArrayList<RectF>()
 
                                 synchronized(stateLock) {
                                     val now = SystemClock.elapsedRealtime()
-                                    countTimestamps.removeAll { now - it > 60_000L }
 
                                     // Olvidar costales que ya no se ven.
                                     tracks.entries.removeAll {
@@ -887,7 +1025,6 @@ class MainActivity : AppCompatActivity() {
                                             track.framesSeen >= MIN_FRAMES_BEFORE_COUNT
                                         ) {
                                             totalCount++
-                                            countTimestamps.add(now)
                                             track.counted = true
                                             newCount = totalCount
                                         }
@@ -898,7 +1035,6 @@ class MainActivity : AppCompatActivity() {
                                     }
 
                                     currentCount = totalCount
-                                    newSpeed = countTimestamps.size
                                 }
 
                                 runOnUiThread {
@@ -912,7 +1048,7 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     }
-                                    updateProductionIndicators(currentCount, newSpeed)
+                                    updateProductionIndicators(currentCount)
                                 }
                             }
                             .addOnFailureListener(cameraExecutor) {
@@ -948,7 +1084,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        mainHandler.removeCallbacks(speedRefreshTask)
 
         if (::cameraExecutor.isInitialized) {
             cameraExecutor.shutdown()
