@@ -486,7 +486,6 @@ class MainActivity : AppCompatActivity() {
             content.addView(input)
         }
         val generalFields = listOf(
-            "fechaFormato" to "Fecha",
             "transportista" to "Transportista",
             "cliente" to "Cliente",
             "operador" to "Operador",
@@ -504,26 +503,36 @@ class MainActivity : AppCompatActivity() {
             "tonelaje" to "Tonelaje",
             "fechaCertificado" to "F. de certificado"
         )
-        addChoiceField("caja", "Caja", arrayOf("1", "2"))
-        addChoiceField("tipoCaja", "Tipo de caja", arrayOf("Full", "Sencillo", "Torton"))
-        generalFields.forEach { addField(it.first, it.second) }
-
-        content.addView(TextView(this).apply {
-            text = "REGISTRO DE FOLIOS (10 RENGLONES)"; textSize = 16f
-            setTextColor(Color.BLACK); setPadding(0, dp(14), 0, dp(6))
-        })
-        val folioFields = mutableListOf<android.widget.EditText>()
-        repeat(10) { index ->
-            content.addView(TextView(this).apply { text = "Renglón ${index + 1}"; textSize = 12f; setTextColor(Color.DKGRAY) })
-            val input = android.widget.EditText(this).apply { hint = "Folio"; textSize = 13f; setSingleLine(true) }
-            folioFields.add(input)
-            content.addView(input)
-        }
+        addField("fechaFormato", "Fecha")
         val startTime = if (countStartTimeMillis > 0L) countStartTimeMillis else System.currentTimeMillis()
         val endTime = System.currentTimeMillis()
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         addAutomaticField("horaEntrada", "Hora de entrada", timeFormat.format(Date(startTime)))
         addAutomaticField("horaSalida", "Hora de salida", timeFormat.format(Date(endTime)))
+        addChoiceField("caja", "Caja", arrayOf("1", "2"))
+        addField("tipoCaja", "Tipo de caja")
+        content.addView(TextView(this).apply {
+            text = "Tipo de unidad"; textSize = 13f; setTextColor(Color.DKGRAY)
+        })
+        val tiposUnidadSeleccionados = linkedSetOf<String>()
+        arrayOf("Full", "Sencillo", "Torton").forEach { tipo ->
+            val check = android.widget.CheckBox(this).apply {
+                text = tipo
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) tiposUnidadSeleccionados.add(tipo) else tiposUnidadSeleccionados.remove(tipo)
+                }
+            }
+            content.addView(check)
+        }
+        generalFields.forEach { addField(it.first, it.second) }
+
+        val folioFields = mutableListOf<android.widget.EditText>()
+        repeat(10) { index ->
+            content.addView(TextView(this).apply { text = "Folio ${index + 1}"; textSize = 13f; setTextColor(Color.DKGRAY) })
+            val input = android.widget.EditText(this).apply { hint = "Escribe aquí"; textSize = 13f; setSingleLine(true) }
+            folioFields.add(input)
+            content.addView(input)
+        }
         listOf(
             "comprobanteTraslado" to "Comprobante de traslado",
             "numeroOrden" to "Número de orden",
@@ -556,17 +565,21 @@ class MainActivity : AppCompatActivity() {
                 }
                 val values = fields.mapValues { it.value.text.toString().trim() }.toMutableMap()
                 values.putAll(selections)
+                values["tipoUnidad"] = tiposUnidadSeleccionados.joinToString(", ")
                 data class PreviewItem(val label: String, var value: String, val key: String)
                 val previewItems = mutableListOf<PreviewItem>()
+                previewItems.add(PreviewItem("Fecha", values["fechaFormato"].orEmpty(), "fechaFormato"))
+                previewItems.add(PreviewItem("Hora de entrada", values["horaEntrada"].orEmpty(), "horaEntrada"))
+                previewItems.add(PreviewItem("Hora de salida", values["horaSalida"].orEmpty(), "horaSalida"))
                 previewItems.add(PreviewItem("Caja", values["caja"].orEmpty(), "caja"))
                 previewItems.add(PreviewItem("Tipo de caja", values["tipoCaja"].orEmpty(), "tipoCaja"))
+                previewItems.add(PreviewItem("Tipo de unidad", values["tipoUnidad"].orEmpty(), "tipoUnidad"))
                 generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
                 folioFields.forEachIndexed { index, input ->
                     val rowValue = input.text.toString().trim()
                     previewItems.add(PreviewItem("Folio — renglón ${index + 1}", rowValue, "folio:$index"))
                 }
                 val additionalFields = listOf(
-                    "horaEntrada" to "Hora de entrada", "horaSalida" to "Hora de salida",
                     "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
                     "bodega" to "Bodega", "banco" to "Banco", "cuadrilla" to "Cuadrilla",
                     "confirmacionEstiba" to "Confirmación de estiba", "rotosOrigen" to "Sacos rotos de origen",
