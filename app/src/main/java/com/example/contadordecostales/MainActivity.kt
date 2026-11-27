@@ -560,81 +560,131 @@ class MainActivity : AppCompatActivity() {
                         android.widget.Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
-                val values = fields.mapValues { it.value.text.toString().trim() }
-                val folios = JSONArray()
-                folioFields.forEach { row ->
-                    val rowJson = JSONArray()
-                    row.forEach { rowJson.put(it.text.toString().trim()) }
-                    folios.put(rowJson)
-                }
-                val totalNeto = originalCount - origen - maniobra
-                val fechaRegistro = SimpleDateFormat(
-                    "dd/MM/yyyy HH:mm:ss", Locale.getDefault()
-                ).format(Date())
-                val previewLines = mutableListOf<String>()
-                previewLines.add("CONSEDE — CONTROL OPERATIVO")
-                previewLines.add("Fecha de registro: $fechaRegistro")
-                previewLines.add("Operación: $operationType")
-                previewLines.add("Conteo original: $originalCount")
-                previewLines.add("Total neto: $totalNeto")
-                previewLines.add("Meta: $productionGoal")
-                generalFields.forEach { (key, label) ->
-                    previewLines.add("$label: ${values[key].orEmpty().ifBlank { "—" }}")
-                }
-                previewLines.add("FOLIOS")
+                val values = fields.mapValues { it.value.text.toString().trim() }.toMutableMap()
+                data class PreviewItem(val label: String, var value: String, val key: String)
+                val previewItems = mutableListOf<PreviewItem>()
+                generalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
                 folioFields.forEachIndexed { index, row ->
-                    previewLines.add("${index + 1}. " + row.joinToString(" | ") {
-                        it.text.toString().trim().ifBlank { "—" }
-                    })
+                    val rowValue = row.joinToString(" | ") { it.text.toString().trim() }
+                    previewItems.add(PreviewItem("Folio — renglón \${index + 1}", rowValue, "folio:$index"))
                 }
-                listOf(
-                    "horaEntrada" to "Hora de entrada",
-                    "horaSalida" to "Hora de salida",
-                    "comprobanteTraslado" to "Comprobante de traslado",
-                    "numeroOrden" to "Número de orden",
-                    "bodega" to "Bodega",
-                    "banco" to "Banco",
-                    "cuadrilla" to "Cuadrilla",
-                    "estiba" to "Estiba",
-                    "rotosOrigen" to "Sacos rotos de origen",
-                    "rotosManiobra" to "Sacos rotos por maniobra",
-                    "comentarios" to "Comentarios",
+                val additionalFields = listOf(
+                    "horaEntrada" to "Hora de entrada", "horaSalida" to "Hora de salida",
+                    "comprobanteTraslado" to "Comprobante de traslado", "numeroOrden" to "Número de orden",
+                    "bodega" to "Bodega", "banco" to "Banco", "cuadrilla" to "Cuadrilla",
+                    "estiba" to "Estiba", "rotosOrigen" to "Sacos rotos de origen",
+                    "rotosManiobra" to "Sacos rotos por maniobra", "comentarios" to "Comentarios",
                     "supervisor" to "Supervisor"
-                ).forEach { (key, label) ->
-                    previewLines.add("$label: ${values[key].orEmpty().ifBlank { "—" }}")
+                )
+                additionalFields.forEach { (key, label) -> previewItems.add(PreviewItem(label, values[key].orEmpty(), key)) }
+                val fechaRegistro = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                val instructionInput = android.widget.EditText(this).apply {
+                    hint = "Escribe indicaciones para este registro"; textSize = 14f; minLines = 2
+                    setPadding(dp(10), dp(8), dp(10), dp(8))
                 }
-                val previewView = TextView(this).apply {
-                    text = previewLines.joinToString("\n"); textSize = 14f
-                    setTextColor(Color.BLACK); setPadding(dp(18), dp(12), dp(18), dp(12))
+                val previewContent = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
                 }
-                val previewScroll = android.widget.ScrollView(this).apply {
-                    addView(previewView); isFillViewport = true
-                }
-                AlertDialog.Builder(this)
-                    .setTitle("Vista previa antes de guardar")
+                val previewScroll = android.widget.ScrollView(this).apply { addView(previewContent); isFillViewport = true }
+                val previewDialog = AlertDialog.Builder(this)
+                    .setTitle("Vista previa editable")
                     .setView(previewScroll)
                     .setNegativeButton("Volver a editar", null)
-                    .setPositiveButton("Confirmar y guardar") { _, _ ->
-                        formDialog.dismiss()
+                    .setPositiveButton("Confirmar y guardar", null)
+                    .create()
+
+                fun renderPreviewItems() {
+                    previewContent.removeAllViews()
+                    previewContent.addView(TextView(this).apply {
+                        text = "CONSEDE — CONTROL OPERATIVO\nFecha: $fechaRegistro\nOperación: $operationType\nConteo original: $originalCount\nTotal neto estimado: " +
+                            (originalCount - (values["rotosOrigen"]?.toIntOrNull() ?: 0) - (values["rotosManiobra"]?.toIntOrNull() ?: 0)) +
+                            "\nMeta: $productionGoal"
+                        textSize = 14f; setTextColor(Color.BLACK); setPadding(dp(6), dp(6), dp(6), dp(12))
+                    })
+                    previewItems.forEachIndexed { index, item ->
+                        val card = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            background = roundedBackground(Color.rgb(238, 242, 246))
+                            setPadding(dp(10), dp(8), dp(10), dp(8))
+                            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                                .apply { setMargins(0, dp(3), 0, dp(3)) }
+                        }
+                        card.addView(TextView(this).apply { text = item.label; textSize = 13f; setTextColor(Color.rgb(45, 55, 65)) })
+                        card.addView(TextView(this).apply {
+                            text = item.value.ifBlank { "—" }; textSize = 15f; setTextColor(Color.BLACK)
+                            setPadding(0, dp(3), 0, dp(5))
+                        })
+                        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                        fun actionButton(label: String, enabled: Boolean = true, action: () -> Unit) {
+                            actions.addView(Button(this@MainActivity).apply {
+                                text = label; textSize = 10f; isAllCaps = false; isEnabled = enabled
+                                setOnClickListener { action() }
+                                layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply { setMargins(dp(2), 0, dp(2), 0) }
+                            })
+                        }
+                        actionButton("Editar") {
+                            val editor = android.widget.EditText(this).apply { setText(item.value); setSelection(text.length); minLines = 1 }
+                            AlertDialog.Builder(this).setTitle("Editar " + item.label).setView(editor)
+                                .setNegativeButton("Cancelar", null)
+                                .setPositiveButton("Aplicar") { _, _ ->
+                                    item.value = editor.text.toString().trim()
+                                    values[item.key] = item.value
+                                    renderPreviewItems()
+                                }.show()
+                        }
+                        actionButton("Eliminar") {
+                            AlertDialog.Builder(this).setMessage("¿Eliminar «" + item.label + "» de este registro?")
+                                .setNegativeButton("Cancelar", null)
+                                .setPositiveButton("Eliminar") { _, _ -> previewItems.removeAt(index); values.remove(item.key); renderPreviewItems() }
+                                .show()
+                        }
+                        actionButton("↑", index > 0) { val moved = previewItems.removeAt(index); previewItems.add(index - 1, moved); renderPreviewItems() }
+                        actionButton("↓", index < previewItems.lastIndex) { val moved = previewItems.removeAt(index); previewItems.add(index + 1, moved); renderPreviewItems() }
+                        card.addView(actions)
+                        previewContent.addView(card)
+                    }
+                    previewContent.addView(TextView(this).apply {
+                        text = "Indicaciones para este registro"; textSize = 14f; setTextColor(Color.BLACK)
+                        setPadding(0, dp(12), 0, dp(4))
+                    })
+                    (instructionInput.parent as? android.view.ViewGroup)?.removeView(instructionInput)
+                    previewContent.addView(instructionInput)
+                }
+
+                renderPreviewItems()
+                previewDialog.setOnShowListener {
+                    previewDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val origenFinal = values["rotosOrigen"]?.toIntOrNull() ?: 0
+                        val maniobraFinal = values["rotosManiobra"]?.toIntOrNull() ?: 0
+                        if (origenFinal < 0 || maniobraFinal < 0 || origenFinal + maniobraFinal > originalCount) {
+                            android.widget.Toast.makeText(this, "Revisa los sacos rotos: no pueden superar el conteo ni ser negativos", android.widget.Toast.LENGTH_LONG).show()
+                            return@setOnClickListener
+                        }
+                        val foliosFinales = JSONArray()
+                        previewItems.filter { it.key.startsWith("folio:") }.forEach { item ->
+                            val parts = item.value.split("|").map { it.trim() }
+                            foliosFinales.put(JSONArray().apply { repeat(3) { col -> put(parts.getOrElse(col) { "" }) } })
+                        }
+                        val totalNetoFinal = originalCount - origenFinal - maniobraFinal
                         val registro = JSONObject().apply {
-                            put("fecha", fechaRegistro)
-                            put("operacion", operationType)
-                            put("conteoOriginal", originalCount)
-                            put("totalNeto", totalNeto)
-                            put("meta", productionGoal)
-                            values.forEach { (key, value) -> put(key, value) }
-                            put("rotosOrigen", origen)
-                            put("rotosManiobra", maniobra)
-                            put("folios", folios)
+                            put("fecha", fechaRegistro); put("operacion", operationType)
+                            put("conteoOriginal", originalCount); put("totalNeto", totalNetoFinal); put("meta", productionGoal)
+                            values.filterKeys { !it.startsWith("folio:") }.forEach { (key, value) -> put(key, value) }
+                            put("rotosOrigen", origenFinal); put("rotosManiobra", maniobraFinal)
+                            put("folios", foliosFinales)
+                            put("ordenVistaPrevia", JSONArray().apply { previewItems.forEach { put(it.label) } })
+                            put("indicaciones", instructionInput.text.toString().trim())
                         }
                         savedCounts.add(registro.toString())
                         val historyArray = JSONArray()
                         savedCounts.forEach { historyArray.put(it) }
                         historyPreferences.edit().putString("registros", historyArray.toString()).apply()
-                        android.widget.Toast.makeText(this,
-                            "Registro guardado correctamente", android.widget.Toast.LENGTH_LONG).show()
+                        formDialog.dismiss(); previewDialog.dismiss()
+                        android.widget.Toast.makeText(this, "Registro guardado correctamente", android.widget.Toast.LENGTH_LONG).show()
                     }
-                    .show()
+                }
+                previewDialog.show()
             }
         }
         formDialog.show()
